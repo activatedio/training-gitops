@@ -1,0 +1,28 @@
+# Module 3 — ArgoCD: the guestbook Deployment (vendored into your gitops repo).
+# Copy this file (and the Service alongside it) into apps/guestbook/ in the repo
+# you bootstrapped from github.com/activatedio/argocd-bootstrap. The template's
+# `default` ApplicationSet turns the apps/guestbook/ directory into an Application
+# automatically — no app to register by hand.
+#
+# In Step 6 you bump the image tag below (v5 -> v4), commit, and review the diff
+# in the ArgoCD UI before syncing.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guestbook-ui
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: guestbook-ui
+  template:
+    metadata:
+      labels:
+        app: guestbook-ui
+    spec:
+      containers:
+        - image: gcr.io/google-samples/gb-frontend:v5
+          name: guestbook-ui
+          ports:
+            - containerPort: 80

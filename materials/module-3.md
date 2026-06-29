@@ -16,12 +16,14 @@ for following along.
 
 ## The Plan: One App, Two Tools
 
-The guestbook is a tiny two-tier web app — a front end and a Redis back
-end — and it's the canonical GitOps demo. The Argo project publishes it
-at github.com/argoproj/argocd-example-apps in a folder named guestbook,
-as plain Kubernetes manifests. That single source of truth lets us
-compare the tools fairly: the manifests never change, only the machinery
-that delivers them.
+The guestbook is a small web app and the canonical GitOps demo. The Argo
+project publishes it at github.com/argoproj/argocd-example-apps in a
+folder named guestbook, as plain Kubernetes manifests — a Deployment and
+a Service. Starting both tools from the same manifests lets us compare
+them fairly. For ArgoCD we'll copy those manifests into our own Git repo
+(so we can change them and watch the diff); for Flux we'll point straight
+at the upstream repo. Either way the workload is identical — only the
+machinery that delivers it differs.
 
 Remember the shape difference from Module 2. ArgoCD wraps the whole app
 in a single object — an Application — and gives you a console to sync
@@ -29,92 +31,180 @@ it. Flux assembles the same outcome from a chain of small controllers,
 each reading a custom resource you commit to Git. Watch for that
 contrast as we go.
 
-## Walkthrough 1 — ArgoCD: the Application and the UI
+## Walkthrough 1 — ArgoCD: bootstrap once, then drive everything from Git
 
-ArgoCD runs inside the cluster as a set of components — an API server, a
-repo server, and the application-controller that does the reconciling.
-We install it, point it at the guestbook, and let it converge.
+You *could* install ArgoCD by piping the upstream manifest into the
+cluster and poking it with the `argocd` CLI — that's how most quickstarts
+do it. But it quietly undercuts the whole point. If the tool that
+reconciles Git is itself installed and changed by hand, its own config
+drifts and nobody can review it. So we'll be GitOps from the very first
+step. We start from a small **bootstrap template** —
+`github.com/activatedio/argocd-bootstrap` — that installs an ArgoCD which
+*manages itself from Git*. After that, every change — to ArgoCD or to our
+apps — is a commit you review in the console, never an imperative command.
 
-### Step 1: Install ArgoCD
+The template is plain Kustomize + `kubectl`, no extra CLI to learn. Once
+bootstrapped it wires three things together: an `argo-cd` Application that
+syncs ArgoCD's own install (bump a version, commit, it upgrades itself), a
+`root` Application that manages your `projects/`, and a `default`
+ApplicationSet that turns every directory under `apps/*` into an
+Application automatically. That `apps/*` convention is how we'll ship the
+guestbook — no app to register by hand.
 
-Create a namespace and apply the upstream install manifest. This brings
-up all of ArgoCD's components in the argocd namespace.
+### Step 1: Clone the template into a repo you control
 
-```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-# wait until every pod is Running
-kubectl get pods -n argocd -w
-```
-
-### Step 2: Reach the UI and log in
-
-The API server isn't exposed by default. Port-forward it, grab the
-auto-generated admin password, and open the console in a browser.
-
-```bash
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-# initial admin password (username is "admin")
-argocd admin initial-password -n argocd
-# then visit https://localhost:8080 and log in
-```
-
-This is the moment ArgoCD differs most from Flux: you now have a
-*graphical control plane*. Everything from here can be done by clicking,
-or by the CLI — your choice.
-
-### Step 3: Create the guestbook — declaratively
-
-The cleanest, GitOps-native way is to declare an Application and apply
-it. This is the CRD at the heart of ArgoCD: it names the source (repo,
-path, revision) and the destination (cluster, namespace).
-
-```
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: guestbook
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/argoproj/argocd-example-apps.git
-    targetRevision: HEAD
-    path: guestbook
-destination:
-  server: https://kubernetes.default.svc
-  namespace: guestbook
-```
+Bootstrap reads its manifests back from Git, so they have to live in a
+repo you own.
 
 ```bash
-kubectl apply -n argocd -f guestbook-application.yaml
+git clone https://github.com/activatedio/argocd-bootstrap
+cd argocd-bootstrap
+git remote set-url origin https://github.com/you/your-gitops-repo
+git push -u origin main
 ```
 
-### Step 4: Sync — the click that closes the loop
+### Step 2: Install ArgoCD with one make target
 
-By default the app is created OutOfSync: ArgoCD knows the desired state
-from Git but hasn't applied it yet. You converge it by syncing. In the
-UI, you open the guestbook app, see the resource tree light up, and
-press the Sync button. From the CLI:
+`make install` bakes your repo URL and the ArgoCD version into the
+manifests, creates the namespace and a repo-access secret from your token,
+server-side-applies the ArgoCD install, waits for it, then applies the
+self-managing Applications. You need a Git token with read access to the
+repo.
 
 ```bash
-argocd app sync guestbook
-# watch it reach Synced / Healthy
-argocd app get guestbook
+make install \
+  GIT_REPO=https://github.com/you/your-gitops-repo \
+  GIT_TOKEN=ghp_your_token \
+  ARGOCD_VERSION=v3.2.12
+
+# publish the rendered manifests so ArgoCD reads the same values back
+git commit -am "bootstrap argo-cd" && git push
 ```
 
-Want it hands-off? Turn on automated sync so future Git commits apply
-themselves, with optional self-heal and prune:
+That push is the important part: the cluster now reconciles *this repo*.
+From here, changing ArgoCD — or anything it manages — means committing to
+Git, not running imperative commands.
+
+### Step 3: Open the UI
 
 ```bash
-argocd app set guestbook --sync-policy automated --self-heal
---auto-prune
+make password        # prints the initial admin password (user: admin)
+make port-forward    # forwards the console to https://localhost:8080
 ```
 
-That's the whole ArgoCD story: one Application object, a resource tree
-you can see, and a Sync that's either a click or an automated policy.
-The UI is the headline feature — you literally watch the control loop
-converge.
+Log in and the control plane is already describing itself: the `argo-cd`,
+`root`, and `default` objects show up Synced and Healthy. This is the
+graphical control plane — everything below is Git plus a few clicks, and
+you never touch the `argocd` CLI.
+
+### Step 4: Start with sync by hand
+
+The template's `default` ApplicationSet ships with automated sync turned
+*on*. We'll switch it off first, so we can drive the first syncs ourselves
+and review every diff before it lands — the habit worth building before
+you trust a new app. Open `projects/default.yaml` and remove the
+`automated` block from the ApplicationSet's template:
+
+```diff
+       syncPolicy:
+-        automated:
+-          prune: true
+-          selfHeal: true
+         syncOptions:
+           - ServerSideApply=true
+           - CreateNamespace=true
+```
+
+```bash
+git commit -am "apps: manual sync to start" && git push
+```
+
+The `root` Application picks up the change, and from now on the `default`
+ApplicationSet creates each app **OutOfSync**, waiting for you to sync it.
+
+### Step 5: Add the guestbook under apps/
+
+Deploy the guestbook the GitOps way: drop its manifests into
+`apps/guestbook/` and let the ApplicationSet discover them. The guestbook
+is just a Deployment and a Service — copy the two upstream manifests in:
+
+```bash
+mkdir -p apps/guestbook
+# apps/guestbook/guestbook-ui-deployment.yaml  (image gcr.io/google-samples/gb-frontend:v5)
+# apps/guestbook/guestbook-ui-svc.yaml
+git add apps/guestbook
+git commit -m "add guestbook" && git push
+```
+
+On its next git poll the ApplicationSet creates a `guestbook` Application.
+In the UI it's **OutOfSync**: ArgoCD knows the desired state from Git but
+hasn't applied it. Open the app, watch the resource tree light up, and
+press **Sync**. The guestbook converges to Healthy.
+
+### Step 6: Change the guestbook and apply it from the diff
+
+Here's the everyday GitOps loop — and the reason manual sync is worth
+seeing first. Bump the container image in
+`apps/guestbook/guestbook-ui-deployment.yaml`:
+
+```diff
+-        - image: gcr.io/google-samples/gb-frontend:v5
++        - image: gcr.io/google-samples/gb-frontend:v4
+```
+
+```bash
+git commit -am "guestbook: pin gb-frontend v4" && git push
+```
+
+Within a minute ArgoCD polls the repo and marks guestbook **OutOfSync**
+again. This time, before syncing, open the **App Diff** panel on the
+application in the UI. You'll see exactly the one-line image change you
+committed — desired (Git) on one side, live (cluster) on the other. That
+review step — *see precisely what will change before it changes* — is the
+heart of GitOps, and it's why teams sync by hand until they trust a given
+app. Once you're happy, press **Sync**, and ArgoCD rolls the Deployment to
+the new image.
+
+### Step 7: Turn on auto-sync
+
+Once you trust the loop, hand it the keys. Put the `automated` block back
+on the ApplicationSet — now every app under `apps/*` syncs itself,
+self-heals manual drift, and prunes whatever you delete from Git:
+
+```diff
+       syncPolicy:
++        automated:
++          prune: true
++          selfHeal: true
+         syncOptions:
+           - ServerSideApply=true
+           - CreateNamespace=true
+```
+
+```bash
+git commit -am "apps: enable automated sync" && git push
+```
+
+Now the diff-then-click step disappears: commit a change and ArgoCD
+applies it on its own. The manual phase you just practiced is the on-ramp;
+auto-sync is where apps live once you trust them.
+
+That's the ArgoCD story, GitOps-first: a template that installs an ArgoCD
+which manages itself, a guestbook shipped by dropping files under `apps/`,
+a diff you review before each manual sync, and an automated policy you flip
+on with a single commit. You never had to drive the tool imperatively —
+Git and the console did all the work.
+
+> **Coming up.** We kept this walkthrough to a single app on a local
+> cluster, but the bootstrap template is the foundation for a lot more.
+> In future modules we'll build on it to: carve workloads into **multiple
+> AppProjects** for per-team RBAC and source/destination scoping; stand up
+> **root Applications** (the app-of-apps pattern) to fan out across many
+> Applications and clusters; **install an ingress controller** through the
+> same `apps/*` mechanism; and integrate ArgoCD with a cloud account —
+> putting the ArgoCD server **behind a load balancer** for easy team
+> access, and wiring up **IAM and GKE Workload Identity** so ArgoCD can
+> form automated, keyless connections to managed cloud clusters.
 
 ## Walkthrough 2 — Flux: the GitOps Toolkit
 
@@ -226,7 +316,7 @@ Use this table to map each tool to how your team actually works.
 | **Dimension** | **ArgoCD** | **Flux** |
 |----|----|----|
 | Deployment model | Application-centric: one Application CRD per app, reconciled by the application-controller | Toolkit-centric: a chain of source-controller, kustomize-controller, and helm-controller |
-| Time to first deploy | Fast: install, create one Application, click Sync (or auto-sync) | Moderate: bootstrap writes Flux into a Git repo first, then add a source plus Kustomization |
+| Time to first deploy | Fast once bootstrapped: a template installs a self-managing ArgoCD, then drop apps under `apps/*` and Sync (or auto-sync) | Moderate: bootstrap writes Flux into a Git repo first, then add a source plus Kustomization |
 | Developer friction | Low for newcomers: GUI guides you; CLI optional | Low for Git-native teams: everything is a committed CR; no GUI to learn |
 | Observability | Rich built-in web UI: live resource tree, diffs, sync history, rollback | CLI-first: flux get / flux logs / events; UI via optional add-ons (Weave GitOps, Capacitor) |
 | Drift handling | Detects drift; self-heal and prune are opt-in toggles | Continuous reconcile; prune and health checks set per Kustomization |
@@ -253,7 +343,7 @@ infrastructure.
 
 **Sources**
 
-* ArgoCD Getting Started & Declarative Setup — argo-cd.readthedocs.io/en/stable/getting_started/ and /operator-manual/declarative-setup/
-* argocd app sync command reference — argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_app_sync/
+* argocd-bootstrap template — github.com/activatedio/argocd-bootstrap
+* ArgoCD Declarative Setup, ApplicationSet & app-of-apps — argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/, /operator-manual/applicationset/, and /operator-manual/cluster-bootstrapping/
 * Flux Getting Started & CLI — fluxcd.io/flux/get-started/ and fluxcd.io/flux/cmd/
 * Guestbook example app — github.com/argoproj/argocd-example-apps (path: guestbook)

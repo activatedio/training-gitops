@@ -19,8 +19,8 @@ two leading controllers.
 - A local Kubernetes cluster ([kind](https://kind.sigs.k8s.io/),
   [k3d](https://k3d.io/), or Docker Desktop) and `kubectl` pointed at it
 - `git`
-- For the Flux walkthrough: a GitHub account and a Personal Access Token with
-  `repo` scope
+- For Module 3 (both the ArgoCD and Flux walkthroughs): a GitHub account, a Git
+  repo you control, and a Personal Access Token with `repo` scope
 
 ## Modules
 
@@ -49,7 +49,10 @@ See [exercises/module1](exercises/module1).
 ### Module 3 — ArgoCD and Flux walkthroughs
 
 Standalone, commented scripts for both the ArgoCD and Flux paths, deploying the
-same guestbook app. Full instructions are in
+same guestbook app. The ArgoCD path is GitOps-first: bootstrap a self-managing
+ArgoCD from the [`activatedio/argocd-bootstrap`](https://github.com/activatedio/argocd-bootstrap)
+template, then ship and change the guestbook entirely through Git and the UI.
+Full instructions are in
 [exercises/module3/README.md](exercises/module3/README.md).
 
 ```bash
