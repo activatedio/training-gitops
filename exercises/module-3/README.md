@@ -25,7 +25,7 @@ everything else through Git commits and the web UI.
 module-3/
 ├── README.md
 ├── argocd/
-│   ├── 01-bootstrap-install.sh  # clone template + `make install` a self-managing ArgoCD
+│   ├── 01-bootstrap-install.sh  # clone template, `make init` + push, then `make install`
 │   ├── 02-access-ui.sh          # make password + port-forward the UI
 │   ├── 03-manual-first.sh       # turn the ApplicationSet's auto-sync OFF (sync by hand)
 │   ├── 04-add-guestbook.sh      # drop the guestbook under apps/ + commit
@@ -59,7 +59,7 @@ Edit the placeholder variables at the top of `argocd/01-bootstrap-install.sh`
 cloned template repo (default `./argocd-bootstrap`, override with `GITOPS_DIR`).
 
 ```bash
-./argocd/01-bootstrap-install.sh   # clone template, make install, commit + push
+./argocd/01-bootstrap-install.sh   # clone template, make init + push, then make install
 ./argocd/02-access-ui.sh           # leave the port-forward running; log in at https://localhost:8080
 ./argocd/03-manual-first.sh        # sync by hand to start (auto-sync OFF)
 ./argocd/04-add-guestbook.sh       # then in the UI: open guestbook (OutOfSync) and press Sync

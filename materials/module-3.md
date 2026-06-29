@@ -1,60 +1,33 @@
 # Module 3 – Hands-On: ArgoCD and Flux
 
-## Cold Open
+## Introduction
 
-In Module 2 we promised concrete examples. So let's deploy the same
-application two ways. We'll take the classic guestbook app and hand it
-to ArgoCD, then hand the very same job to Flux. Same Git repository,
-same end state — a running guestbook in your cluster — but two very
-different paths to get there. By the end you'll have typed the real
-commands for both, seen where each one asks for your attention, and have
-a table to help you pick the right tool for your stack.
+Let's use GitOps to deploy the same guestbook sample application to a Kubernetes cluster
+using ArgoCD and Flux. To follow along, you will need:
 
-One assumption before we start: you have a running cluster and kubectl
-pointed at it. A local k3d, kind, or Docker Desktop cluster is perfect
-for following along.
-
-## The Plan: One App, Two Tools
-
-The guestbook is a small web app and the canonical GitOps demo. The Argo
-project publishes it at github.com/argoproj/argocd-example-apps in a
-folder named guestbook, as plain Kubernetes manifests — a Deployment and
-a Service. Starting both tools from the same manifests lets us compare
-them fairly. For ArgoCD we'll copy those manifests into our own Git repo
-(so we can change them and watch the diff); for Flux we'll point straight
-at the upstream repo. Either way the workload is identical — only the
-machinery that delivers it differs.
-
-Remember the shape difference from Module 2. ArgoCD wraps the whole app
-in a single object — an Application — and gives you a console to sync
-it. Flux assembles the same outcome from a chain of small controllers,
-each reading a custom resource you commit to Git. Watch for that
-contrast as we go.
+* Docker
+* A GitHub account
+* And Make
 
 ## Walkthrough 1 — ArgoCD: bootstrap once, then drive everything from Git
 
-You *could* install ArgoCD by piping the upstream manifest into the
-cluster and poking it with the `argocd` CLI — that's how most quickstarts
-do it. But it quietly undercuts the whole point. If the tool that
-reconciles Git is itself installed and changed by hand, its own config
-drifts and nobody can review it. So we'll be GitOps from the very first
-step. We start from a small **bootstrap template** —
-`github.com/activatedio/argocd-bootstrap` — that installs an ArgoCD which
-*manages itself from Git*. After that, every change — to ArgoCD or to our
-apps — is a commit you review in the console, never an imperative command.
+Let's start by installing ArgoCD using a GitOps approach similar to the popular argocd-autopilot project. In fact, feel free to use that project as a starting point for your own ArgoCD install.
 
-The template is plain Kustomize + `kubectl`, no extra CLI to learn. Once
-bootstrapped it wires three things together: an `argo-cd` Application that
-syncs ArgoCD's own install (bump a version, commit, it upgrades itself), a
-`root` Application that manages your `projects/`, and a `default`
-ApplicationSet that turns every directory under `apps/*` into an
-Application automatically. That `apps/*` convention is how we'll ship the
-guestbook — no app to register by hand.
+We start from a small **bootstrap template** `github.com/activatedio/argocd-bootstrap` that installs an ArgoCD instance which
+*manages itself from Git*. After that you can push changes to the Git repoisitory to manage the ArgoCD installation.
+
+The bootstra will wire up three things:
+
+1. An `argo-cd` Application that syncs ArgoCD's own install.
+2. A `root` Application that manages your `projects/`
+3. A `default`ApplicationSet that turns every directory under `apps` into an
+Application automatically.
+
+We will deploy the guestbook application using a subdirectory under `apps`
 
 ### Step 1: Clone the template into a repo you control
 
-Bootstrap reads its manifests back from Git, so they have to live in a
-repo you own.
+First, clone the template and push into a repo you control.
 
 ```bash
 git clone https://github.com/activatedio/argocd-bootstrap
@@ -63,27 +36,44 @@ git remote set-url origin https://github.com/you/your-gitops-repo
 git push -u origin main
 ```
 
-### Step 2: Install ArgoCD with one make target
+### Step 2: Render the templates, push, then install
 
-`make install` bakes your repo URL and the ArgoCD version into the
-manifests, creates the namespace and a repo-access secret from your token,
-server-side-applies the ArgoCD install, waits for it, then applies the
-self-managing Applications. You need a Git token with read access to the
-repo.
+We use two Make targets, in order. `make init` bakes your variables into the
+manifests; then — after you commit and push — `make install` applies them to the
+cluster. Rendering and pushing *first* is what makes this clean: ArgoCD reads
+back exactly what you applied, so its very first reconcile is already in sync,
+with no transient drift while the control plane comes up. (Prefer not to use
+Make? Each target is just a couple of plain commands you can run directly.)
+
+First, create a GitHub Personal Access Token (PAT) with the `repo` scope, then
+export your settings — Make picks these up from the environment:
 
 ```bash
-make install \
-  GIT_REPO=https://github.com/you/your-gitops-repo \
-  GIT_TOKEN=ghp_your_token \
-  ARGOCD_VERSION=v3.2.12
-
-# publish the rendered manifests so ArgoCD reads the same values back
-git commit -am "bootstrap argo-cd" && git push
+export GIT_REPO=https://github.com/you/your-gitops-repo
+export GIT_TOKEN=ghp_your_token
+export ARGOCD_VERSION=v3.2.12
 ```
 
-That push is the important part: the cluster now reconciles *this repo*.
-From here, changing ArgoCD — or anything it manages — means committing to
-Git, not running imperative commands.
+Render the templates and publish them. This only edits files in your repo —
+nothing touches the cluster yet:
+
+```bash
+make init      # bakes GIT_REPO + ARGOCD_VERSION into the manifests
+git commit -am "init gitops repo" && git push
+```
+
+Now install. This creates the repo-access secret and applies ArgoCD. Because the
+repo is already rendered and pushed, your working tree doesn't change — `install`
+only talks to the cluster:
+
+```bash
+make install   # repo secret + ArgoCD install + self-management
+```
+
+That order is the important part: the rendered repo is pushed *before* ArgoCD
+reads it, so the cluster reconciles *this repo* from the first moment. From here,
+changing ArgoCD — or anything it manages — means committing to Git, not running
+imperative commands.
 
 ### Step 3: Open the UI
 

@@ -6,17 +6,20 @@
 # manages ITSELF from Git. After this, every change is a commit you review in
 # the UI — not an imperative command.
 #
-# What `make install` does (each phase is also its own make target):
-#   render the repo URL + version into the manifests, create the namespace and a
-#   repo-access secret from your token, server-side-apply the ArgoCD install,
-#   wait for it, then apply the self-managing `root` + `argo-cd` Applications.
+# The flow is render -> push -> install, in that order. Rendering and pushing
+# BEFORE installing means ArgoCD reads back exactly what you applied, so its
+# first reconcile is already in sync:
+#   make init     bakes GIT_REPO + ARGOCD_VERSION into the manifests (files only)
+#   git push      publishes the rendered repo
+#   make install  creates the repo secret, applies the ArgoCD install, waits,
+#                 then applies the self-managing `root` + `argo-cd` Applications
 #
-# EDIT THESE before running:
+# EDIT THESE before running (Make reads them from the environment):
 set -euo pipefail
 
-GIT_REPO="${GIT_REPO:-https://github.com/you/your-gitops-repo}"
-GIT_TOKEN="${GIT_TOKEN:-ghp_your_token_with_repo_read}"
-ARGOCD_VERSION="${ARGOCD_VERSION:-v3.2.12}"
+export GIT_REPO="${GIT_REPO:-https://github.com/you/your-gitops-repo}"
+export GIT_TOKEN="${GIT_TOKEN:-ghp_your_token_with_repo_read}"
+export ARGOCD_VERSION="${ARGOCD_VERSION:-v3.2.12}"
 GITOPS_DIR="${GITOPS_DIR:-argocd-bootstrap}"   # where the template is cloned
 
 # 1. Clone the template (skip if you already have it) and point it at YOUR repo.
@@ -27,14 +30,15 @@ cd "$GITOPS_DIR"
 git remote set-url origin "$GIT_REPO"
 git push -u origin main
 
-# 2. Install ArgoCD (one target runs all phases above).
-make install \
-  GIT_REPO="$GIT_REPO" \
-  GIT_TOKEN="$GIT_TOKEN" \
-  ARGOCD_VERSION="$ARGOCD_VERSION"
+# 2. Render the templates with your variables (edits files only, no cluster).
+make init
 
 # 3. Publish the rendered manifests so ArgoCD reads the same values back.
-git commit -am "bootstrap argo-cd" && git push
+git commit -am "init gitops repo" && git push
+
+# 4. Install: repo secret + ArgoCD install + self-management. The working tree
+#    is already rendered and pushed, so this only talks to the cluster.
+make install
 
 echo
 echo "✓ ArgoCD is installed and self-managing. Next: ./02-access-ui.sh"
