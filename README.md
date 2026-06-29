@@ -26,9 +26,9 @@ two leading controllers.
 
 | # | Module | Reading | Exercises |
 |---|--------|---------|-----------|
-| 1 | **The Control Loop** — essential Kubernetes: clusters, etcd/API server, and how Deployment → ReplicaSet → Pod is a chain of closed loops | [materials/module-1.md](materials/module-1.md) | [exercises/module1](exercises/module1) |
+| 1 | **The Control Loop** — essential Kubernetes: clusters, etcd/API server, and how Deployment → ReplicaSet → Pod is a chain of closed loops | [materials/module-1.md](materials/module-1.md) | [exercises/module-1](exercises/module-1) |
 | 2 | **Resources and Helm Charts** — the wider set of resource kinds, why raw manifests don't scale, Helm as packaging, and Git as the setpoint | [materials/module-2.md](materials/module-2.md) | — |
-| 3 | **Hands-On: ArgoCD and Flux** — deploy the canonical guestbook app two ways and compare the tools on an identical workload | [materials/module-3.md](materials/module-3.md) | [exercises/module3](exercises/module3) |
+| 3 | **Hands-On: ArgoCD and Flux** — deploy the canonical guestbook app two ways and compare the tools on an identical workload | [materials/module-3.md](materials/module-3.md) | [exercises/module-3](exercises/module-3) |
 
 ## Hands-on exercises
 
@@ -39,12 +39,12 @@ and lets you watch the controllers reconcile desired state — including deletin
 a Pod and watching the ReplicaSet replace it.
 
 ```bash
-cd exercises/module1
+cd exercises/module-1
 chmod +x demo.sh
 ./demo.sh
 ```
 
-See [exercises/module1](exercises/module1).
+See [exercises/module-1](exercises/module-1).
 
 ### Module 3 — ArgoCD and Flux walkthroughs
 
@@ -53,10 +53,10 @@ same guestbook app. The ArgoCD path is GitOps-first: bootstrap a self-managing
 ArgoCD from the [`activatedio/argocd-bootstrap`](https://github.com/activatedio/argocd-bootstrap)
 template, then ship and change the guestbook entirely through Git and the UI.
 Full instructions are in
-[exercises/module3/README.md](exercises/module3/README.md).
+[exercises/module-3/README.md](exercises/module-3/README.md).
 
 ```bash
-cd exercises/module3
+cd exercises/module-3
 chmod +x argocd/*.sh flux/*.sh
 ```
 
@@ -70,8 +70,8 @@ training/
 │   ├── module-2.md
 │   └── module-3.md
 └── exercises/           # runnable hands-on material
-    ├── module1/         # control-loop demo (kind + kubectl)
-    └── module3/         # ArgoCD and Flux walkthroughs
+    ├── module-1/        # control-loop demo (kind + kubectl)
+    └── module-3/        # ArgoCD and Flux walkthroughs
 ```
 
 ## Further reading

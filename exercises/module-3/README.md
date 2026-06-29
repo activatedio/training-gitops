@@ -22,7 +22,7 @@ everything else through Git commits and the web UI.
 ## Layout
 
 ```
-module3/
+module-3/
 ├── README.md
 ├── argocd/
 │   ├── 01-bootstrap-install.sh  # clone template + `make install` a self-managing ArgoCD
