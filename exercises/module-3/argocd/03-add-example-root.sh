@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
-# Module 3 — ArgoCD: Build the "dev" root (app-of-apps) from scratch
+# Module 3 — ArgoCD: Build the "example" root (app-of-apps) from scratch
 # The template ships the default/roots/cluster-addons projects and a live
 # cluster-addons-root, but no workloads. Here we stand up a NEW root the GitOps
 # way:
-#   1. add a child Application under roots/dev/ (podinfo, pulled from its Helm repo)
-#   2. add a `dev-root` Application to projects/roots.yaml pointing at roots/dev/
-# The `root` Application applies dev-root, dev-root applies podinfo — app-of-apps.
+#   1. add a child Application under roots/example/ (podinfo, pulled from its Helm repo)
+#   2. add an `example-root` Application to projects/roots.yaml pointing at roots/example/
+# The `root` Application applies example-root, example-root applies podinfo — app-of-apps.
 set -euo pipefail
 
 GITOPS_DIR="${GITOPS_DIR:-argocd-bootstrap}"
 # The podinfo child Application in this exercises checkout.
-SRC="$(cd "$(dirname "$0")/../manifests/roots/dev" && pwd)"
+SRC="$(cd "$(dirname "$0")/../manifests/roots/example" && pwd)"
 
 cd "$GITOPS_DIR"
 REPO_URL="$(git remote get-url origin)"
 
 # 1. The child Application (references the podinfo Helm repo — no repo URL to set).
-mkdir -p roots/dev
-cp "$SRC/podinfo.yaml" roots/dev/podinfo.yaml
+mkdir -p roots/example
+cp "$SRC/podinfo.yaml" roots/example/podinfo.yaml
 
-# 2. The dev-root, appended to projects/roots.yaml (idempotent).
-if ! grep -q 'name: dev-root' projects/roots.yaml; then
+# 2. The example-root, appended to projects/roots.yaml (idempotent).
+if ! grep -q 'name: example-root' projects/roots.yaml; then
   cat >> projects/roots.yaml <<YAML
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dev-root
+  name: example-root
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -34,7 +34,7 @@ spec:
   project: roots
   source:
     repoURL: ${REPO_URL}
-    path: roots/dev
+    path: roots/example
     targetRevision: HEAD
     directory:
       recurse: true
@@ -51,8 +51,8 @@ spec:
 YAML
 fi
 
-git add roots/dev/podinfo.yaml projects/roots.yaml
-git commit -m "add dev root + podinfo" && git push
+git add roots/example/podinfo.yaml projects/roots.yaml
+git commit -m "add example root + podinfo" && git push
 
 echo
-echo "✓ dev-root + podinfo committed. In the UI watch: root -> dev-root -> podinfo (namespace 'podinfo')."
+echo "✓ example-root + podinfo committed. In the UI watch: root -> example-root -> podinfo (namespace 'podinfo')."

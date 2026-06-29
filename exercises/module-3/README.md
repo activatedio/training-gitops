@@ -11,7 +11,7 @@ The ArgoCD path is **GitOps-first**: instead of piping the install manifest and
 driving the `argocd` CLI, you bootstrap a *self-managing* ArgoCD from the
 [`activatedio/argocd-bootstrap`](https://github.com/activatedio/argocd-bootstrap)
 template (an [argocd-autopilot](https://github.com/argoproj-labs/argocd-autopilot)-style
-layout with `default` / `roots` / `cluster-addons` projects), then build a `dev`
+layout with `default` / `roots` / `cluster-addons` projects), then build an `example`
 **app-of-apps root** that deploys podinfo — all through Git commits and the UI.
 
 ## Prerequisites
@@ -30,7 +30,7 @@ module-3/
 ├── argocd/
 │   ├── 01-bootstrap-install.sh  # clone template, `make init` + push, then `make install`
 │   ├── 02-access-ui.sh          # make password + port-forward the UI
-│   ├── 03-add-dev-root.sh       # build the dev root: add roots/dev/podinfo.yaml + dev-root, commit
+│   ├── 03-add-example-root.sh       # build the example root: add roots/example/podinfo.yaml + example-root, commit
 │   └── 04-change-and-sync.sh    # change a chart value, commit, watch it sync
 ├── flux/
 │   ├── 01-install-cli.sh        # install flux CLI + pre-flight check
@@ -39,7 +39,7 @@ module-3/
 │   ├── 04-create-helmrelease.sh # declare the HelmRelease (helm-controller) + commit
 │   └── 05-observe.sh            # CLI observability (get / reconcile / logs)
 └── manifests/
-    └── roots/dev/podinfo.yaml             # podinfo child Application (copied in by 03)
+    └── roots/example/podinfo.yaml             # podinfo child Application (copied in by 03)
 ```
 
 ## How to run
@@ -59,7 +59,7 @@ cloned template repo (default `./argocd-bootstrap`, override with `GITOPS_DIR`).
 ```bash
 ./argocd/01-bootstrap-install.sh   # clone template, make init + push, then make install
 ./argocd/02-access-ui.sh           # leave the port-forward running; log in at https://localhost:8080
-./argocd/03-add-dev-root.sh        # build the dev root + podinfo; watch root -> dev-root -> podinfo
+./argocd/03-add-example-root.sh        # build the example root + podinfo; watch root -> example-root -> podinfo
 ./argocd/04-change-and-sync.sh     # change a value; watch podinfo sync (or review the App Diff first)
 ```
 
@@ -85,14 +85,14 @@ Edit the placeholder variables at the top of `flux/02-bootstrap.sh`
   `cluster-addons-root` carries add-ons (a commented `sealed-secrets` example).
   See the template's own README.
 - Workloads arrive via the **app-of-apps roots** pattern, not a directory
-  ApplicationSet. `03-add-dev-root.sh` builds a `dev` root: it commits
-  `roots/dev/podinfo.yaml` (a child Application) and a `dev-root` Application in
-  `projects/roots.yaml`. `root` → `dev-root` → `podinfo`.
+  ApplicationSet. `03-add-example-root.sh` builds an `example` root: it commits
+  `roots/example/podinfo.yaml` (a child Application) and an `example-root` Application in
+  `projects/roots.yaml`. `root` → `example-root` → `podinfo`.
 - podinfo is deployed from its Helm repository, nothing vendored: under ArgoCD
   the child Application sources the chart directly; under Flux a `HelmRepository`
   source + `HelmRelease` (helm-controller) does the same.
 - To move podinfo to a new chart release, bump `targetRevision:` in
-  `roots/dev/podinfo.yaml`.
+  `roots/example/podinfo.yaml`.
 - Port-forwarding the ArgoCD UI is for local/demo use, not production.
 - `flux bootstrap` commits Flux's own controllers into your Git repo — this is
   intentional ("Flux manages Flux the GitOps way").

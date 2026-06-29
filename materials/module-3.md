@@ -44,7 +44,7 @@ directly with `kubectl`, no autopilot CLI. The bootstrap wires up:
 5. The **cluster-addons** project — scopes add-ons synced to every cluster. It
    ships unpopulated, with a commented `sealed-secrets` example showing the pattern.
 
-Workloads arrive through the roots pattern. Below we'll build a `dev` root from
+Workloads arrive through the roots pattern. Below we'll build an `example` root from
 scratch and let it deploy podinfo.
 
 ### Clone the template into a repo you control
@@ -99,16 +99,16 @@ plane managing itself: the `argo-cd`, `root`, and `cluster-addons-root`
 Applications and the `cluster-resources` ApplicationSet, all Synced. No workloads
 yet — we add those next.
 
-### Build a "dev" root and deploy podinfo
+### Build an "example" root and deploy podinfo
 
 Workloads enter through the **app-of-apps roots** pattern. We'll stand up a new
-`dev` root from scratch: a child Application for podinfo, plus a root Application
+`example` root from scratch: a child Application for podinfo, plus a root Application
 that points at the folder holding it.
 
 First, the child — podinfo, pulled straight from its **Helm repository** (nothing
 vendored). This is a normal ArgoCD `Application` whose source is the chart:
 
-`roots/dev/podinfo.yaml`
+`roots/example/podinfo.yaml`
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -135,21 +135,21 @@ spec:
     syncOptions: [ServerSideApply=true, CreateNamespace=true]
 ```
 
-Then the root — a `dev-root` Application (in the `roots` project) that syncs the
-`roots/dev/` directory. Add it to `projects/roots.yaml` (next to
+Then the root — an `example-root` Application (in the `roots` project) that syncs the
+`roots/example/` directory. Add it to `projects/roots.yaml` (next to
 `cluster-addons-root`), pointing `repoURL` at your repo:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dev-root
+  name: example-root
   namespace: argocd
 spec:
   project: roots
   source:
     repoURL: https://github.com/you/your-gitops-repo
-    path: roots/dev
+    path: roots/example
     targetRevision: HEAD
     directory:
       recurse: true
@@ -164,15 +164,15 @@ spec:
 Commit and push:
 
 ```bash
-git add roots/dev/podinfo.yaml projects/roots.yaml
-git commit -m "add dev root + podinfo" && git push
+git add roots/example/podinfo.yaml projects/roots.yaml
+git commit -m "add example root + podinfo" && git push
 ```
 
-Watch the chain in the UI: `root` applies your new `dev-root`, `dev-root` applies
+Watch the chain in the UI: `root` applies your new `example-root`, `example-root` applies
 the `podinfo` Application, and `podinfo` pulls the chart from its Helm repository
 and deploys it to the `podinfo` namespace. That's app-of-apps — a root is just an
 Application whose children are more Applications. To change podinfo later, edit
-`roots/dev/podinfo.yaml` (e.g. bump `targetRevision`), commit, and ArgoCD shows
+`roots/example/podinfo.yaml` (e.g. bump `targetRevision`), commit, and ArgoCD shows
 the diff before it syncs.
 
 ## Walkthrough 2 — Flux: the GitOps Toolkit
