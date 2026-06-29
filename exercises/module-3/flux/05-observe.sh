@@ -5,12 +5,12 @@
 # controller logs when something looks off.
 set -euo pipefail
 
-# Current state of your Kustomizations and Git sources.
-flux get kustomizations
+# Current state of your HelmReleases and Git sources.
+flux get helmreleases
 flux get sources git
 
 # Force an immediate reconcile (pull the source too).
-flux reconcile kustomization guestbook --with-source
+flux reconcile helmrelease podinfo --with-source
 
 # Tail controller logs to debug.
 flux logs --follow

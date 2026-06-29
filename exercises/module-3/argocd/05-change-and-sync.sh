@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
-# Module 3 — ArgoCD Step 6: Change the guestbook and apply it from the diff
-# The everyday GitOps loop. We bump the container image tag, commit, and push.
-# ArgoCD marks guestbook OutOfSync on its next poll.
+# Module 3 — ArgoCD Step 6: Change podinfo and apply it from the diff
+# The everyday GitOps loop, Helm-style. We change a chart value (the UI banner),
+# commit, and push. ArgoCD re-renders the chart and marks podinfo OutOfSync.
 #
 # Then — BEFORE syncing — open the App Diff panel in the UI. You'll see exactly
-# this one-line image change: desired (Git) beside live (cluster). Reviewing the
-# diff before it lands is the whole point of manual sync. Press Sync to roll the
-# Deployment to the new image.
+# the value change reflected in the rendered Deployment: desired (Git) beside
+# live (cluster). Reviewing the diff before it lands is the whole point of manual
+# sync. Press Sync to roll it out.
+#
+# (To move to a new chart release instead, bump the dependency version in
+#  apps/podinfo/Chart.yaml and refresh Chart.lock with `helm dependency update`.)
 set -euo pipefail
 
 GITOPS_DIR="${GITOPS_DIR:-argocd-bootstrap}"
 cd "$GITOPS_DIR"
 
-DEPLOY=apps/guestbook/guestbook-ui-deployment.yaml
+VALUES=apps/podinfo/values.yaml
 
-# Bump gb-frontend v5 -> v4 (idempotent).
-if grep -q 'gb-frontend:v5' "$DEPLOY"; then
-  perl -pi -e 's{gb-frontend:v5}{gb-frontend:v4}' "$DEPLOY"
-  git commit -am "guestbook: pin gb-frontend v4" && git push
-  echo "✓ Image bumped to v4 and pushed."
-  echo "  In the UI: guestbook -> App Diff (review), then Sync."
+# Change the UI banner message (idempotent-ish: only flips the default).
+if grep -q 'Deployed by GitOps' "$VALUES"; then
+  perl -pi -e 's{Deployed by GitOps}{Updated via a reviewed diff}' "$VALUES"
+  git commit -am "podinfo: change ui.message" && git push
+  echo "✓ ui.message changed and pushed."
+  echo "  In the UI: podinfo -> App Diff (review), then Sync."
 else
-  echo "Image is not at v5 (already changed?) — edit $DEPLOY by hand to try another tag."
+  echo "ui.message already changed — edit $VALUES by hand to try another value."
 fi

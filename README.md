@@ -15,7 +15,7 @@ loop, Kubernetes resources and Helm packaging, and walks through deploying a sam
 |---|--------|---------|-----------|
 | 1 | **The Control Loop** — essential Kubernetes: clusters, etcd/API server, and how Deployment → ReplicaSet → Pod is a chain of closed loops | [materials/module-1.md](materials/module-1.md) | [exercises/module-1](exercises/module-1) |
 | 2 | **Resources and Helm Charts** — the wider set of resource kinds, why raw manifests don't scale, Helm as packaging, and Git as the setpoint | [materials/module-2.md](materials/module-2.md) | — |
-| 3 | **Hands-On: ArgoCD and Flux** — deploy the canonical guestbook app two ways and compare the tools on an identical workload | [materials/module-3.md](materials/module-3.md) | [exercises/module-3](exercises/module-3) |
+| 3 | **Hands-On: ArgoCD and Flux** — deploy the podinfo app from its Helm repo two ways and compare the tools on an identical workload | [materials/module-3.md](materials/module-3.md) | [exercises/module-3](exercises/module-3) |
 
 ## Repository layout
 
@@ -36,4 +36,4 @@ training/
 - ArgoCD — [Getting Started](https://argo-cd.readthedocs.io/en/stable/getting_started/) · [Declarative Setup](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/)
 - Flux — [Getting Started](https://fluxcd.io/flux/get-started/) · [CLI reference](https://fluxcd.io/flux/cmd/)
 - [Helm](https://helm.sh/docs/) · [Kind](https://kind.sigs.k8s.io/) · [Kubernetes docs](https://kubernetes.io/docs/)
-- Example app — [argocd-example-apps](https://github.com/argoproj/argocd-example-apps) (path: `guestbook`)
+- Example app — [podinfo](https://github.com/stefanprodan/podinfo) (Helm repo: `https://stefanprodan.github.io/podinfo`)
