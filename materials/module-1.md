@@ -1,6 +1,6 @@
 # Module 1 – Control Loop
 
-## Cold Open
+## Introduction
 
 In this video we'll look at how GitOps — with tools like ArgoCD and Flux
 can be used to manage Kubernetes clusters effectively. We’ll start by

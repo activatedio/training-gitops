@@ -40,29 +40,24 @@ We install it, point it at the guestbook, and let it converge.
 Create a namespace and apply the upstream install manifest. This brings
 up all of ArgoCD's components in the argocd namespace.
 
+```bash
 kubectl create namespace argocd
-
-kubectl apply -n argocd \\
-
--f
-https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-\# wait until every pod is Running
-
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# wait until every pod is Running
 kubectl get pods -n argocd -w
+```
 
 ### Step 2: Reach the UI and log in
 
 The API server isn't exposed by default. Port-forward it, grab the
 auto-generated admin password, and open the console in a browser.
 
+```bash
 kubectl port-forward svc/argocd-server -n argocd 8080:443
-
-\# initial admin password (username is "admin")
-
+# initial admin password (username is "admin")
 argocd admin initial-password -n argocd
-
-\# then visit https://localhost:8080 and log in
+# then visit https://localhost:8080 and log in
+```
 
 This is the moment ArgoCD differs most from Flux: you now have a
 *graphical control plane*. Everything from here can be done by clicking,
@@ -74,48 +69,26 @@ The cleanest, GitOps-native way is to declare an Application and apply
 it. This is the CRD at the heart of ArgoCD: it names the source (repo,
 path, revision) and the destination (cluster, namespace).
 
+```
 apiVersion: argoproj.io/v1alpha1
-
 kind: Application
-
 metadata:
-
-name: guestbook
-
-namespace: argocd
-
+  name: guestbook
+  namespace: argocd
 spec:
-
-project: default
-
-source:
-
-repoURL: https://github.com/argoproj/argocd-example-apps.git
-
-targetRevision: HEAD
-
-path: guestbook
-
+  project: default
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
+    targetRevision: HEAD
+    path: guestbook
 destination:
+  server: https://kubernetes.default.svc
+  namespace: guestbook
+```
 
-server: https://kubernetes.default.svc
-
-namespace: guestbook
-
+```bash
 kubectl apply -n argocd -f guestbook-application.yaml
-
-Prefer the CLI in one line? argocd app create does the same thing
-without writing a file:
-
-argocd app create guestbook \\
-
---repo https://github.com/argoproj/argocd-example-apps.git \\
-
---path guestbook \\
-
---dest-server https://kubernetes.default.svc \\
-
---dest-namespace guestbook
+```
 
 ### Step 4: Sync — the click that closes the loop
 
@@ -124,17 +97,19 @@ from Git but hasn't applied it yet. You converge it by syncing. In the
 UI, you open the guestbook app, see the resource tree light up, and
 press the Sync button. From the CLI:
 
+```bash
 argocd app sync guestbook
-
-\# watch it reach Synced / Healthy
-
+# watch it reach Synced / Healthy
 argocd app get guestbook
+```
 
 Want it hands-off? Turn on automated sync so future Git commits apply
 themselves, with optional self-heal and prune:
 
+```bash
 argocd app set guestbook --sync-policy automated --self-heal
 --auto-prune
+```
 
 That's the whole ArgoCD story: one Application object, a resource tree
 you can see, and a Sync that's either a click or an automated policy.
@@ -151,13 +126,13 @@ moving parts are exposed.
 
 ### Step 1: Install the CLI and check the cluster
 
-\# install the flux CLI
-
-curl -s https://fluxcd.io/install.sh \| sudo bash
-
-\# verify the cluster can run Flux
+```bash
+# install the flux CLI
+curl -s https://fluxcd.io/install.sh | sudo bash
+# verify the cluster can run Flux
 
 flux check --pre
+```
 
 ### Step 2: Bootstrap Flux into a Git repo
 
@@ -190,15 +165,13 @@ one job.
 First tell Flux where the guestbook manifests live. A GitRepository
 source is fetched by the source-controller on an interval.
 
-flux create source git guestbook \\
-
---url=https://github.com/argoproj/argocd-example-apps.git \\
-
---branch=master \\
-
---interval=1m \\
-
---export \> ./clusters/my-cluster/guestbook-source.yaml
+```bash
+flux create source git guestbook \
+--url=https://github.com/argoproj/argocd-example-apps.git \
+--branch=master \
+--interval=1m \
+--export > ./clusters/my-cluster/guestbook-source.yaml
+```
 
 ### Step 4: Declare the Kustomization
 
@@ -206,44 +179,39 @@ Now point the kustomize-controller at the path inside that source. A
 Kustomization applies the manifests and, with --prune, removes anything
 you later delete from Git.
 
-flux create kustomization guestbook \\
-
---source=GitRepository/guestbook \\
-
---path="./guestbook" \\
-
---prune=true \\
-
---target-namespace=guestbook \\
-
---interval=5m \\
-
---health-check="Deployment/guestbook-ui.guestbook" \\
-
---export \> ./clusters/my-cluster/guestbook-kustomization.yaml
+```bash
+flux create kustomization guestbook \
+  --source=GitRepository/guestbook \
+  --path="./guestbook" \
+  --prune=true \
+  --target-namespace=guestbook \
+  --interval=5m \
+  --health-check="Deployment/guestbook-ui.guestbook" \
+  --export > ./clusters/my-cluster/guestbook-kustomization.yaml
+```
 
 Commit both files. Because Flux is already syncing this repo, the moment
 your commit lands the controllers pick it up and deploy the guestbook —
 no extra apply needed.
 
+```bash
 git add -A && git commit -m "deploy guestbook" && git push
+```
 
 ### Step 5: Observe — from the command line
 
 Flux has no Sync button, so you watch with the CLI. You can also force
 an immediate reconcile instead of waiting for the interval.
 
+```bash
+
 flux get kustomizations
-
 flux get sources git
-
-\# force an immediate reconcile
-
+# force an immediate reconcile
 flux reconcile kustomization guestbook --with-source
-
-\# tail controller logs when something looks off
-
+# tail controller logs when something looks off
 flux logs --follow
+```
 
 That's the Flux story: a source plus a Kustomization, committed to Git
 and reconciled by a chain of single-purpose controllers. The pipeline is
@@ -285,15 +253,7 @@ infrastructure.
 
 **Sources**
 
-ArgoCD Getting Started & Declarative Setup —
-argo-cd.readthedocs.io/en/stable/getting_started/ and
-/operator-manual/declarative-setup/
-
-argocd app sync command reference —
-argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_app_sync/
-
-Flux Getting Started & CLI — fluxcd.io/flux/get-started/ and
-fluxcd.io/flux/cmd/
-
-Guestbook example app — github.com/argoproj/argocd-example-apps (path:
-guestbook)
+* ArgoCD Getting Started & Declarative Setup — argo-cd.readthedocs.io/en/stable/getting_started/ and /operator-manual/declarative-setup/
+* argocd app sync command reference — argo-cd.readthedocs.io/en/stable/user-guide/commands/argocd_app_sync/
+* Flux Getting Started & CLI — fluxcd.io/flux/get-started/ and fluxcd.io/flux/cmd/
+* Guestbook example app — github.com/argoproj/argocd-example-apps (path: guestbook)
