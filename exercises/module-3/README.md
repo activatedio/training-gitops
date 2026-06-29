@@ -31,10 +31,18 @@ module-3/
 │   ├── 01-bootstrap-install.sh  # clone template, `make init` + push, then `make install`
 │   ├── 02-access-ui.sh          # make password + port-forward the UI
 │   ├── 03-add-example-root.sh   # build the example root: add roots/example/podinfo.yaml + example-root, commit
-│   └── 04-change-and-sync.sh    # change a chart value, commit, watch it sync
-└── manifests/
-    └── roots/example/podinfo.yaml   # podinfo child Application (copied in by 03)
+│   ├── 04-change-and-sync.sh    # change a chart value, commit, watch it sync
+│   └── 05-enable-ingress.sh     # ingress-nginx add-on + expose ArgoCD & podinfo at *.localtest.me
+└── manifests/                                          # demo content to copy into your gitops repo
+    ├── roots/example/podinfo.yaml                       # podinfo child Application (copied in by 03)
+    ├── roots/cluster-addons/sealed-secrets.yaml         # sealed-secrets add-on (see the material)
+    ├── roots/cluster-addons/ingress-nginx.yaml          # ingress-nginx add-on (copied in by 05)
+    └── cluster-resources/in-cluster/argocd-server-ingress.yaml  # ArgoCD UI Ingress (copied in by 05)
 ```
+
+> The bootstrap template ships **no** add-ons — `roots/cluster-addons/` is empty.
+> These demo add-ons live here in the course repo; you add them to your gitops
+> clone (the material walks through sealed-secrets, and `05` does ingress-nginx).
 
 ## How to run
 
@@ -53,7 +61,13 @@ cloned template repo (default `./argocd-bootstrap`, override with `GITOPS_DIR`).
 ./argocd/02-access-ui.sh           # leave the port-forward running; log in at https://localhost:8080
 ./argocd/03-add-example-root.sh    # build the example root + podinfo; watch root -> example-root -> podinfo
 ./argocd/04-change-and-sync.sh     # change a value; watch podinfo sync (or review the App Diff first)
+./argocd/05-enable-ingress.sh      # then open https://argocd.localtest.me and http://podinfo.localtest.me
 ```
+
+> `05-enable-ingress.sh` needs the kind cluster to map host 80/443 and label a
+> node `ingress-ready` — the Module 1 config does this. If your cluster predates
+> it, recreate it (`kind create cluster --config exercises/module-1/kind-config.yaml`)
+> and re-run `01-bootstrap-install.sh` before enabling ingress.
 
 ## Notes
 
@@ -71,6 +85,10 @@ cloned template repo (default `./argocd-bootstrap`, override with `GITOPS_DIR`).
   Application sources the chart directly.
 - To move podinfo to a new chart release, bump `targetRevision:` in
   `roots/example/podinfo.yaml`.
+- `05-enable-ingress.sh` installs the ingress-nginx add-on (Helm, kind-tuned
+  values), exposes the ArgoCD UI via an SSL-passthrough Ingress (no
+  `server.insecure` — port-forward over HTTPS still works), and turns on
+  podinfo's chart ingress. Hosts use `*.localtest.me` (resolves to 127.0.0.1).
 - Port-forwarding the ArgoCD UI is for local/demo use, not production.
 
 ## Sources

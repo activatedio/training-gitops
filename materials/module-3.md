@@ -160,8 +160,8 @@ encrypted form lives in Git and the plaintext only ever exists inside the
 cluster.
 
 That makes it an ideal cluster-addon: every cluster needs the controller, and the
-install is identical everywhere. The template ships it as a commented
-ApplicationSet at `roots/cluster-addons/sealed-secrets.yaml` — uncomment it:
+install is identical everywhere. Add it as an ApplicationSet at
+`roots/cluster-addons/sealed-secrets.yaml` (a copy is in the Module 3 exercises):
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -285,6 +285,146 @@ from its Helm repository and deploys it to the `podinfo` namespace. That's
 app-of-apps — a root is just an Application whose children are more
 Applications. To change podinfo later, edit `roots/example/podinfo.yaml` (e.g.
 bump `targetRevision`), commit, and ArgoCD shows the diff before it syncs.
+
+## Beyond port-forward: an ingress controller
+
+So far we've reached ArgoCD and podinfo with `kubectl port-forward`. In a real
+cluster you'd put an **ingress controller** in front and reach services at real
+URLs. Let's install ingress-nginx as a cluster-addon and route both the ArgoCD UI
+and podinfo through it.
+
+### Recreate the cluster with ingress port-mappings
+
+On kind, a controller only works if the cluster maps the host's ports 80/443 onto
+a node and labels it `ingress-ready`. The Module 1 config already includes this
+(`exercises/module-1/kind-config.yaml`). If your cluster predates that change,
+recreate it, then re-run `make install` from your gitops clone to bring ArgoCD
+back:
+
+```bash
+kind delete cluster --name gitops-demo
+kind create cluster --config exercises/module-1/kind-config.yaml
+make install
+```
+
+### Enable the ingress-nginx cluster-addon
+
+Add ingress-nginx as an add-on at `roots/cluster-addons/ingress-nginx.yaml`
+(beside sealed-secrets; a copy is in the Module 3 exercises). It's a
+`clusters`-generator ApplicationSet in the `cluster-addons` project that installs
+the ingress-nginx Helm chart with kind-tuned values:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+spec:
+  generators:
+    - clusters: {}
+  template:
+    metadata:
+      name: 'ingress-nginx-{{name}}'
+      namespace: argocd
+    spec:
+      project: cluster-addons
+      source:
+        repoURL: https://kubernetes.github.io/ingress-nginx
+        chart: ingress-nginx
+        targetRevision: 4.12.1
+        helm:
+          releaseName: ingress-nginx
+          valuesObject:
+            controller:
+              hostPort: { enabled: true }       # bind node 80/443; kind's port-mappings reach it
+              service: { type: ClusterIP }
+              nodeSelector: { ingress-ready: "true" }
+              tolerations:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: Equal
+                  effect: NoSchedule
+              extraArgs: { enable-ssl-passthrough: "true" }   # for the ArgoCD Ingress below
+              admissionWebhooks: { enabled: false }
+      destination:
+        server: '{{server}}'
+        namespace: ingress-nginx
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions: [ServerSideApply=true, CreateNamespace=true]
+```
+
+```bash
+git add roots/cluster-addons/ingress-nginx.yaml
+git commit -m "enable ingress-nginx cluster-addon" && git push
+```
+
+The `cluster-addons-root` picks it up and the controller comes up on the
+control-plane node.
+
+### Route the ArgoCD UI through the ingress
+
+argocd-server serves HTTPS, so we use nginx's **SSL passthrough** — the controller
+hands the TLS connection straight to argocd-server, no `server.insecure` needed
+(your HTTPS `port-forward` keeps working too). Add an `Ingress` as a
+cluster-resource; dropping it in `cluster-resources/in-cluster/` lets the
+`cluster-resources` ApplicationSet sync it into the `argocd` namespace:
+
+`cluster-resources/in-cluster/argocd-server-ingress.yaml`
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: argocd.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port: { number: 443 }
+```
+
+### Tie podinfo into the ingress
+
+podinfo's chart has built-in ingress support, so add ingress values to the
+podinfo Application in `roots/example/podinfo.yaml`:
+
+```yaml
+      valuesObject:
+        ui:
+          message: "Deployed by GitOps"
+        ingress:
+          enabled: true
+          className: nginx
+          hosts:
+            - host: podinfo.localtest.me
+              paths:
+                - path: /
+                  pathType: ImplementationSpecific
+```
+
+Commit and push both:
+
+```bash
+git add cluster-resources/in-cluster/argocd-server-ingress.yaml roots/example/podinfo.yaml
+git commit -m "expose argocd + podinfo via ingress" && git push
+```
+
+`*.localtest.me` resolves to `127.0.0.1`, and kind forwards your host's 80/443 to
+the controller. Once everything syncs you can open **https://argocd.localtest.me**
+(the ArgoCD UI — accept the self-signed cert warning) and
+**http://podinfo.localtest.me** directly, no port-forward required.
 
 ### Wrap-up
 

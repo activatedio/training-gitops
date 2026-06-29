@@ -4,5 +4,22 @@ apiVersion: kind.x-k8s.io/v1alpha4
 name: gitops-demo
 nodes:
   - role: control-plane
+    # Prep the control-plane node for an ingress controller (used in Module 3):
+    # label it so ingress-nginx schedules here, and map the host's 80/443 onto
+    # the node so the controller is reachable from your machine. Harmless for
+    # the Module 1 control-loop demo.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
   - role: worker
   - role: worker
