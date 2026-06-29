@@ -29,14 +29,23 @@ Let's start by installing ArgoCD using a GitOps approach similar to the popular 
 We start from a small **bootstrap template** `github.com/activatedio/argocd-bootstrap` that installs an ArgoCD instance which
 *manages itself from Git*. After that you can push changes to the Git repoisitory to manage the ArgoCD installation.
 
-The bootstrap will wire up three things:
+The template's layout follows [argocd-autopilot](https://github.com/argoproj-labs/argocd-autopilot)
+— `bootstrap/` + `projects/` + a `cluster-resources` ApplicationSet — applied
+directly with `kubectl`, no autopilot CLI. The bootstrap wires up:
 
 1. An `argo-cd` Application that syncs ArgoCD's own install.
-2. A `root` Application that manages your `projects/`
-3. A `default`ApplicationSet that turns every directory under `apps` into an
-Application automatically.
+2. A `root` Application that manages the projects under `projects/`: `default`,
+   `roots`, and `cluster-addons`.
+3. A `cluster-resources` ApplicationSet (in the **default** project) for
+   cluster-scoped resources (the `in-cluster` folder = the cluster ArgoCD runs in).
+4. The **roots** project — app-of-apps roots. Each root Application points at a
+   directory under `roots/` and fans out into child Applications. A live
+   `cluster-addons-root` is the in-repo example.
+5. The **cluster-addons** project — scopes add-ons synced to every cluster. It
+   ships unpopulated, with a commented `sealed-secrets` example showing the pattern.
 
-We will deploy the podinfo application using a subdirectory under `apps`
+Workloads arrive through the roots pattern. Below we'll build a `dev` root from
+scratch and let it deploy podinfo.
 
 ### Clone the template into a repo you control
 
@@ -70,20 +79,13 @@ make init      # bakes GIT_REPO + ARGOCD_VERSION into the manifests
 git commit -am "init gitops repo" && git push
 ```
 
-Now install. This creates the repo-access secret and applies the main ArgoCD manifest.
+Now install. 
+
+This creates the repo-access secret, applies the main ArgoCD manifest, waits for ArgoCD to come up, and then bootstraps self-management: the `argo-cd` and `root` Applications, the `cluster-resources` ApplicationSet, and the projects under `projects/` (`default`, `roots`, `cluster-addons`).
 
 ```bash
 make install   # repo secret + ArgoCD install + self-management
 ```
-
-When it returns, check that the control plane came up and is already managing itself.
-
-```bash
-make status                  # lists the argo-cd, root, and default objects
-kubectl get pods -n argocd   # every component should be Running
-```
-
-You want the `argo-cd`, `root`, and `default` objects reporting `Synced` / `Healthy`. If `argo-cd` shows `OutOfSync`, the rendered manifests probably weren't pushed before `make install` ran; push them and it converges.
 
 ### Open the UI
 
@@ -92,50 +94,86 @@ make password        # prints the initial admin password (user: admin)
 make port-forward    # forwards the console to https://localhost:8080
 ```
 
-Log in and see the installed applications.
+Open http://localhost:8080 in your browser, log in, and you'll see the control
+plane managing itself: the `argo-cd`, `root`, and `cluster-addons-root`
+Applications and the `cluster-resources` ApplicationSet, all Synced. No workloads
+yet — we add those next.
 
-### Install podinfo from a Helm repository
+### Build a "dev" root and deploy podinfo
 
-Deploy podinfo the GitOps way: drop a directory into `apps/podinfo/` and let the
-ApplicationSet discover it. Since Module 2 made the case for Helm, we'll pull
-podinfo straight from its **Helm repository** — nothing about the chart is copied
-into your repo. All `apps/podinfo/` holds is a tiny *umbrella* chart that
-references the upstream chart as a dependency:
+Workloads enter through the **app-of-apps roots** pattern. We'll stand up a new
+`dev` root from scratch: a child Application for podinfo, plus a root Application
+that points at the folder holding it.
 
-`apps/podinfo/Chart.yaml`
+First, the child — podinfo, pulled straight from its **Helm repository** (nothing
+vendored). This is a normal ArgoCD `Application` whose source is the chart:
 
-```yaml
-apiVersion: v2
-name: podinfo
-version: 0.1.0
-dependencies:
-  - name: podinfo
-    version: 6.14.0
-    repository: https://stefanprodan.github.io/podinfo
-```
-
-`apps/podinfo/values.yaml` (override the chart's values — keyed by the dependency name)
+`roots/dev/podinfo.yaml`
 
 ```yaml
-podinfo:
-  replicaCount: 1
-  ui:
-    message: "Deployed by GitOps"
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: podinfo
+  namespace: argocd
+spec:
+  project: roots
+  source:
+    repoURL: https://stefanprodan.github.io/podinfo
+    chart: podinfo
+    targetRevision: 6.14.0
+    helm:
+      releaseName: podinfo
+      valuesObject:
+        ui:
+          message: "Deployed by GitOps"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: podinfo
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true, CreateNamespace=true]
 ```
 
-Run `helm dependency update apps/podinfo` once to generate `Chart.lock` (which
-pins the resolved version), commit the three small files, and push:
+Then the root — a `dev-root` Application (in the `roots` project) that syncs the
+`roots/dev/` directory. Add it to `projects/roots.yaml` (next to
+`cluster-addons-root`), pointing `repoURL` at your repo:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-root
+  namespace: argocd
+spec:
+  project: roots
+  source:
+    repoURL: https://github.com/you/your-gitops-repo
+    path: roots/dev
+    targetRevision: HEAD
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true, CreateNamespace=true]
+```
+
+Commit and push:
 
 ```bash
-git add apps/podinfo
-git commit -m "add podinfo (helm repo chart)" && git push
+git add roots/dev/podinfo.yaml projects/roots.yaml
+git commit -m "add dev root + podinfo" && git push
 ```
 
-On its next git poll the ApplicationSet creates a `podinfo` Application. ArgoCD
-reads the `Chart.lock`, pulls podinfo from the Helm repository, renders it, and
-syncs — the chart is fetched on demand, never vendored. To move to a new chart
-release later, bump the dependency `version`, refresh `Chart.lock`, commit, and
-ArgoCD shows the diff before it syncs.
+Watch the chain in the UI: `root` applies your new `dev-root`, `dev-root` applies
+the `podinfo` Application, and `podinfo` pulls the chart from its Helm repository
+and deploys it to the `podinfo` namespace. That's app-of-apps — a root is just an
+Application whose children are more Applications. To change podinfo later, edit
+`roots/dev/podinfo.yaml` (e.g. bump `targetRevision`), commit, and ArgoCD shows
+the diff before it syncs.
 
 ## Walkthrough 2 — Flux: the GitOps Toolkit
 
@@ -246,7 +284,7 @@ Use this table to map each tool to how your team actually works.
 | **Dimension** | **ArgoCD** | **Flux** |
 |----|----|----|
 | Deployment model | Application-centric: one Application CRD per app, reconciled by the application-controller | Toolkit-centric: a chain of source-controller, kustomize-controller, and helm-controller |
-| Time to first deploy | Fast once bootstrapped: a template installs a self-managing ArgoCD, then drop apps under `apps/*` and Sync (or auto-sync) | Moderate: bootstrap writes Flux into a Git repo first, then add a source plus a Kustomization or HelmRelease |
+| Time to first deploy | Fast once bootstrapped: a template installs a self-managing ArgoCD, then add a root + child Applications (app-of-apps) | Moderate: bootstrap writes Flux into a Git repo first, then add a source plus a Kustomization or HelmRelease |
 | Developer friction | Low for newcomers: GUI guides you; CLI optional | Low for Git-native teams: everything is a committed CR; no GUI to learn |
 | Observability | Rich built-in web UI: live resource tree, diffs, sync history, rollback | CLI-first: flux get / flux logs / events; UI via optional add-ons (Weave GitOps, Capacitor) |
 | Drift handling | Detects drift; self-heal and prune are opt-in toggles | Continuous reconcile; prune and health checks set per Kustomization / HelmRelease |

@@ -1,5 +1,0 @@
-# Values for the podinfo subchart are keyed under the dependency name.
-podinfo:
-  replicaCount: 1
-  ui:
-    message: "Deployed by GitOps"

@@ -4,14 +4,15 @@ Hands-on command scripts extracted from **Module 3: ArgoCD and Flux**.
 Both walkthroughs deploy the same app — [**podinfo**](https://github.com/stefanprodan/podinfo),
 pulled from its **Helm repository** (`https://stefanprodan.github.io/podinfo`) —
 two different ways so you can compare the tools on an identical workload. The
-chart is never vendored: ArgoCD references it through a small umbrella chart and
-Flux through a `HelmRepository` source.
+chart is never vendored: ArgoCD references it from a child Application and Flux
+pulls it through a `HelmRepository` source.
 
 The ArgoCD path is **GitOps-first**: instead of piping the install manifest and
 driving the `argocd` CLI, you bootstrap a *self-managing* ArgoCD from the
 [`activatedio/argocd-bootstrap`](https://github.com/activatedio/argocd-bootstrap)
-template, ship podinfo by dropping files under `apps/*`, and then do
-everything else through Git commits and the web UI.
+template (an [argocd-autopilot](https://github.com/argoproj-labs/argocd-autopilot)-style
+layout with `default` / `roots` / `cluster-addons` projects), then build a `dev`
+**app-of-apps root** that deploys podinfo — all through Git commits and the UI.
 
 ## Prerequisites
 
@@ -29,10 +30,8 @@ module-3/
 ├── argocd/
 │   ├── 01-bootstrap-install.sh  # clone template, `make init` + push, then `make install`
 │   ├── 02-access-ui.sh          # make password + port-forward the UI
-│   ├── 03-manual-first.sh       # turn the ApplicationSet's auto-sync OFF (sync by hand)
-│   ├── 04-add-podinfo.sh        # drop the podinfo umbrella chart under apps/ + commit
-│   ├── 05-change-and-sync.sh    # change a chart value, review the diff, Sync
-│   └── 06-enable-autosync.sh    # turn auto-sync back ON for apps/*
+│   ├── 03-add-dev-root.sh       # build the dev root: add roots/dev/podinfo.yaml + dev-root, commit
+│   └── 04-change-and-sync.sh    # change a chart value, commit, watch it sync
 ├── flux/
 │   ├── 01-install-cli.sh        # install flux CLI + pre-flight check
 │   ├── 02-bootstrap.sh          # bootstrap Flux into a Git repo
@@ -40,11 +39,7 @@ module-3/
 │   ├── 04-create-helmrelease.sh # declare the HelmRelease (helm-controller) + commit
 │   └── 05-observe.sh            # CLI observability (get / reconcile / logs)
 └── manifests/
-    ├── applicationset-syncpolicy.md       # the manual/auto sync-policy edits, explained
-    └── apps/podinfo/                      # umbrella chart to copy into your repo (nothing vendored)
-        ├── Chart.yaml                     # declares the podinfo dependency (Helm repo)
-        ├── Chart.lock                     # pins the resolved chart version
-        └── values.yaml                    # overrides for the podinfo subchart
+    └── roots/dev/podinfo.yaml             # podinfo child Application (copied in by 03)
 ```
 
 ## How to run
@@ -64,10 +59,8 @@ cloned template repo (default `./argocd-bootstrap`, override with `GITOPS_DIR`).
 ```bash
 ./argocd/01-bootstrap-install.sh   # clone template, make init + push, then make install
 ./argocd/02-access-ui.sh           # leave the port-forward running; log in at https://localhost:8080
-./argocd/03-manual-first.sh        # sync by hand to start (auto-sync OFF)
-./argocd/04-add-podinfo.sh         # then in the UI: open podinfo (OutOfSync) and press Sync
-./argocd/05-change-and-sync.sh     # then in the UI: review App Diff, then Sync
-./argocd/06-enable-autosync.sh     # hand the loop the keys
+./argocd/03-add-dev-root.sh        # build the dev root + podinfo; watch root -> dev-root -> podinfo
+./argocd/04-change-and-sync.sh     # change a value; watch podinfo sync (or review the App Diff first)
 ```
 
 ### Flux path
@@ -85,19 +78,21 @@ Edit the placeholder variables at the top of `flux/02-bootstrap.sh`
 
 ## Notes
 
-- The ArgoCD path installs a *self-managing* ArgoCD: the `argo-cd` Application
-  syncs ArgoCD's own install, `root` manages `projects/`, and the `default`
-  ApplicationSet turns every `apps/*` directory into an Application. See the
-  template's own README for the full picture.
-- `03-manual-first.sh` / `06-enable-autosync.sh` toggle one block in
-  `projects/default.yaml`; the before/after YAML is in
-  [`manifests/applicationset-syncpolicy.md`](manifests/applicationset-syncpolicy.md).
-- Both walkthroughs deploy the **podinfo** chart from its Helm repository,
-  nothing vendored: ArgoCD references it via the umbrella chart in
-  `apps/podinfo/` (resolved through `Chart.lock`), and Flux installs it via a
-  `HelmRepository` source + `HelmRelease` handled by the helm-controller.
-- Regenerate `apps/podinfo/Chart.lock` with `helm dependency update apps/podinfo`
-  if you bump the dependency version in `Chart.yaml`.
+- The ArgoCD path installs a *self-managing* ArgoCD (autopilot-style layout):
+  the `argo-cd` Application syncs ArgoCD's own install, `root` manages the
+  `default` / `roots` / `cluster-addons` projects, the `cluster-resources`
+  ApplicationSet (default project) handles cluster-scoped resources, and the
+  `cluster-addons-root` carries add-ons (a commented `sealed-secrets` example).
+  See the template's own README.
+- Workloads arrive via the **app-of-apps roots** pattern, not a directory
+  ApplicationSet. `03-add-dev-root.sh` builds a `dev` root: it commits
+  `roots/dev/podinfo.yaml` (a child Application) and a `dev-root` Application in
+  `projects/roots.yaml`. `root` → `dev-root` → `podinfo`.
+- podinfo is deployed from its Helm repository, nothing vendored: under ArgoCD
+  the child Application sources the chart directly; under Flux a `HelmRepository`
+  source + `HelmRelease` (helm-controller) does the same.
+- To move podinfo to a new chart release, bump `targetRevision:` in
+  `roots/dev/podinfo.yaml`.
 - Port-forwarding the ArgoCD UI is for local/demo use, not production.
 - `flux bootstrap` commits Flux's own controllers into your Git repo — this is
   intentional ("Flux manages Flux the GitOps way").

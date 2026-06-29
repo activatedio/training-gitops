@@ -1,0 +1,31 @@
+# podinfo — a child Application under the dev root (app-of-apps). Runs in the
+# `roots` project; its source is the podinfo Helm chart pulled straight from its
+# Helm repository (nothing vendored). Bump targetRevision for a new release.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: podinfo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: roots
+  source:
+    repoURL: https://stefanprodan.github.io/podinfo
+    chart: podinfo
+    targetRevision: 6.14.0
+    helm:
+      releaseName: podinfo
+      valuesObject:
+        ui:
+          message: "Deployed by GitOps"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: podinfo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
