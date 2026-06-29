@@ -6,8 +6,20 @@ Let's use GitOps to deploy the same guestbook sample application to a Kubernetes
 using ArgoCD and Flux. To follow along, you will need:
 
 * Docker
+* `kind` and `kubectl`
 * A GitHub account
 * And Make
+
+### The cluster
+
+We'll reuse the same local `kind` cluster from Module 1. If it's still running you're set — `kubectl get nodes` should list the `gitops-demo` control-plane and two workers. If you tore it down (or skipped Module 1), recreate it from the config in the exercises:
+
+```bash
+kind create cluster --config exercises/module-1/kind-config.yaml
+kubectl get nodes      # the gitops-demo control-plane + 2 workers
+```
+
+`kind delete cluster --name gitops-demo` removes it again when you're done.
 
 ## Walkthrough 1 — ArgoCD: bootstrap once, then drive everything from Git
 
@@ -38,15 +50,11 @@ git push -u origin main
 
 ### Step 2: Render the templates, push, then install
 
-We use two Make targets, in order. `make init` bakes your variables into the
-manifests; then — after you commit and push — `make install` applies them to the
-cluster. Rendering and pushing *first* is what makes this clean: ArgoCD reads
-back exactly what you applied, so its very first reconcile is already in sync,
-with no transient drift while the control plane comes up. (Prefer not to use
-Make? Each target is just a couple of plain commands you can run directly.)
+While we will use a Git repository to manage the ArgoCD installation, we need to boostrap it with local manifests that contain correct values for our installation and are in sync with the referenced repository on GitHub. 
 
-First, create a GitHub Personal Access Token (PAT) with the `repo` scope, then
-export your settings — Make picks these up from the environment:
+These steps use of Make, which you can install with any package manager, including Homebew on a Mac. If you really don't want to use make you can just run the commands directly.
+
+First, create a GitHub Personal Access Token (PAT) with the `repo` scope. Then export it along with the repo URL and version of ArgoCD you want to install.
 
 ```bash
 export GIT_REPO=https://github.com/you/your-gitops-repo
@@ -54,26 +62,27 @@ export GIT_TOKEN=ghp_your_token
 export ARGOCD_VERSION=v3.2.12
 ```
 
-Render the templates and publish them. This only edits files in your repo —
-nothing touches the cluster yet:
+Render the templates and publish them. This only edits files in your repo nothing will be applied yet to the cluster.
 
 ```bash
 make init      # bakes GIT_REPO + ARGOCD_VERSION into the manifests
 git commit -am "init gitops repo" && git push
 ```
 
-Now install. This creates the repo-access secret and applies ArgoCD. Because the
-repo is already rendered and pushed, your working tree doesn't change — `install`
-only talks to the cluster:
+Now install. This creates the repo-access secret and applies the main ArgoCD manifest.
 
 ```bash
 make install   # repo secret + ArgoCD install + self-management
 ```
 
-That order is the important part: the rendered repo is pushed *before* ArgoCD
-reads it, so the cluster reconciles *this repo* from the first moment. From here,
-changing ArgoCD — or anything it manages — means committing to Git, not running
-imperative commands.
+When it returns, check that the control plane came up and is already managing itself.
+
+```bash
+make status                  # lists the argo-cd, root, and default objects
+kubectl get pods -n argocd   # every component should be Running
+```
+
+You want the `argo-cd`, `root`, and `default` objects reporting `Synced` / `Healthy` — that's ArgoCD reconciling itself from the repo you just pushed. If `argo-cd` is `OutOfSync`, the rendered manifests probably weren't pushed before `make install` ran; push them and it converges.
 
 ### Step 3: Open the UI
 

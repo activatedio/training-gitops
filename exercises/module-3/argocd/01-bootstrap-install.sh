@@ -40,5 +40,10 @@ git commit -am "init gitops repo" && git push
 #    is already rendered and pushed, so this only talks to the cluster.
 make install
 
+# 5. Check the install: the argo-cd, root, and default objects should report
+#    Synced / Healthy, and every pod in the argocd namespace should be Running.
+make status
+kubectl get pods -n argocd
+
 echo
 echo "✓ ArgoCD is installed and self-managing. Next: ./02-access-ui.sh"
