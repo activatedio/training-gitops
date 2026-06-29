@@ -15,7 +15,8 @@ loop, Kubernetes resources and Helm packaging, and walks through deploying a sam
 |---|--------|---------|-----------|
 | 1 | **The Control Loop** — essential Kubernetes: clusters, etcd/API server, and how Deployment → ReplicaSet → Pod is a chain of closed loops | [materials/module-1.md](materials/module-1.md) | [exercises/module-1](exercises/module-1) |
 | 2 | **Resources and Helm Charts** — the wider set of resource kinds, why raw manifests don't scale, Helm as packaging, and Git as the setpoint | [materials/module-2.md](materials/module-2.md) | — |
-| 3 | **Hands-On: ArgoCD and Flux** — deploy the podinfo app from its Helm repo two ways and compare the tools on an identical workload | [materials/module-3.md](materials/module-3.md) | [exercises/module-3](exercises/module-3) |
+| 3 | **Hands-On: ArgoCD** — bootstrap a self-managing ArgoCD and deploy the podinfo app via the app-of-apps roots pattern | [materials/module-3.md](materials/module-3.md) | [exercises/module-3](exercises/module-3) |
+| 4 | **Hands-On: Flux** — deploy the same podinfo app with Flux, then compare the two engines side by side | [materials/module-4.md](materials/module-4.md) | [exercises/module-4](exercises/module-4) |
 
 ## Repository layout
 
@@ -25,10 +26,12 @@ training/
 ├── materials/           # course reading (Markdown), one file per module
 │   ├── module-1.md
 │   ├── module-2.md
-│   └── module-3.md
+│   ├── module-3.md
+│   └── module-4.md
 └── exercises/           # runnable hands-on material
     ├── module-1/        # control-loop demo (kind + kubectl)
-    └── module-3/        # ArgoCD and Flux walkthroughs
+    ├── module-3/        # ArgoCD walkthrough
+    └── module-4/        # Flux walkthrough
 ```
 
 ## Further reading

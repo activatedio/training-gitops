@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Module 3 — Flux Step 3: Declare the source
+# Module 4 — Flux Step 3: Declare the source
 # Tell Flux where the chart lives. A HelmRepository source points the
 # source-controller at podinfo's Helm repository (the same one ArgoCD pulled
 # from); it polls the repo index on an interval. --export writes the CR to a file

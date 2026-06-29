@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Module 3 — Flux Step 1: Install the CLI and check the cluster
+# Module 4 — Flux Step 1: Install the CLI and check the cluster
 # Installs the flux CLI, then verifies the cluster can run Flux.
 set -euo pipefail
 

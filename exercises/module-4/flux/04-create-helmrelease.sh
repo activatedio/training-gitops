@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Module 3 — Flux Step 4: Declare the HelmRelease
+# Module 4 — Flux Step 4: Declare the HelmRelease
 # Hand the chart to the helm-controller. A HelmRelease names the chart in the
 # HelmRepository source (podinfo, pinned to a version) and the helm-controller
 # installs and upgrades the actual Helm release to match. Then commit both files

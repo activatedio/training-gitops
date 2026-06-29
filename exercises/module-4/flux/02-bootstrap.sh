@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Module 3 — Flux Step 2: Bootstrap Flux into a Git repo
+# Module 4 — Flux Step 2: Bootstrap Flux into a Git repo
 # Flux bootstraps itself by committing its own controllers into a Git
 # repository, then configures the cluster to sync from that repo
 # ("Flux manages Flux the GitOps way"). This brings up the toolkit
