@@ -1,0 +1,17 @@
+# Module 3 — ArgoCD Step 3 (declarative form)
+# The Application CRD is the object at the heart of ArgoCD. Apply it with:
+#   kubectl apply -n argocd -f manifests/guestbook-application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
+    targetRevision: HEAD
+    path: guestbook
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: guestbook
