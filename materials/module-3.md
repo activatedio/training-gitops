@@ -179,7 +179,7 @@ spec:
     spec:
       project: cluster-addons
       source:
-        repoURL: https://bitnami-labs.github.io/sealed-secrets
+        repoURL: https://bitnami.github.io/sealed-secrets
         chart: sealed-secrets
         targetRevision: 2.17.4
         helm:

@@ -41,9 +41,6 @@ spec:
         name: '{{.path.basename}}'
         namespace: ingress-nginx
       syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
         syncOptions:
           - ServerSideApply=true
           - CreateNamespace=true
