@@ -1,18 +1,29 @@
-# ingress-nginx cluster add-on (live version copied in by 05-enable-ingress.sh).
-# A clusters-generator ApplicationSet, in the cluster-addons project, installing
-# the ingress-nginx Helm chart with kind-tuned values. On a real cluster you'd
-# use controller.service.type: LoadBalancer instead of hostPort.
+# ingress-nginx cluster add-on (Module 3 demo), per-cluster opt-in.
+#
+# Unlike sealed-secrets (a `clusters` generator that installs everywhere), this
+# uses a git *files* generator: it only creates an Application for clusters that
+# have a cluster-configs/<cluster>/ingress-nginx.yaml opt-in file. The directory
+# name is the cluster's ArgoCD name and becomes destination.name.
+#
+# __GIT_REPO_URL__ is substituted with your gitops repo by 03-install-ingress.sh.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: ingress-nginx
   namespace: argocd
 spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
   generators:
-    - clusters: {}
+    - git:
+        repoURL: __GIT_REPO_URL__
+        revision: HEAD
+        files:
+          - path: roots/cluster-addons/cluster-configs/*/ingress-nginx.yaml
   template:
     metadata:
-      name: 'ingress-nginx-{{name}}'
+      name: 'ingress-nginx-{{.path.basename}}'
       namespace: argocd
       finalizers:
         - resources-finalizer.argocd.argoproj.io
@@ -21,27 +32,13 @@ spec:
       source:
         repoURL: https://kubernetes.github.io/ingress-nginx
         chart: ingress-nginx
-        targetRevision: 4.12.1
+        targetRevision: '{{.chartVersion}}'
         helm:
           releaseName: ingress-nginx
-          valuesObject:
-            controller:
-              hostPort:
-                enabled: true
-              service:
-                type: ClusterIP
-              nodeSelector:
-                ingress-ready: "true"
-              tolerations:
-                - key: node-role.kubernetes.io/control-plane
-                  operator: Equal
-                  effect: NoSchedule
-              extraArgs:
-                enable-ssl-passthrough: "true"
-              admissionWebhooks:
-                enabled: false
+          values: |
+            {{- toYaml .values | nindent 12 }}
       destination:
-        server: '{{server}}'
+        name: '{{.path.basename}}'
         namespace: ingress-nginx
       syncPolicy:
         automated:

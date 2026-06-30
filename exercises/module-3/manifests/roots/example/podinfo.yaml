@@ -19,6 +19,14 @@ spec:
       valuesObject:
         ui:
           message: "Deployed by GitOps"
+        ingress:
+          enabled: true
+          className: nginx
+          hosts:
+            - host: podinfo.localtest.me
+              paths:
+                - path: /
+                  pathType: ImplementationSpecific
   destination:
     server: https://kubernetes.default.svc
     namespace: podinfo

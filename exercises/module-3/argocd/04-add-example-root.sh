@@ -6,6 +6,8 @@
 #   1. add a child Application under roots/example/ (podinfo, pulled from its Helm repo)
 #   2. add an `example-root` Application to projects/roots.yaml pointing at roots/example/
 # The `root` Application applies example-root, example-root applies podinfo — app-of-apps.
+# Because the ingress controller is already up (03), podinfo ships with its chart
+# ingress enabled and lands at http://podinfo.localtest.me.
 set -euo pipefail
 
 GITOPS_DIR="${GITOPS_DIR:-argocd-bootstrap}"
@@ -55,4 +57,5 @@ git add roots/example/podinfo.yaml projects/roots.yaml
 git commit -m "add example root + podinfo" && git push
 
 echo
-echo "✓ example-root + podinfo committed. In the UI watch: root -> example-root -> podinfo (namespace 'podinfo')."
+echo "✓ example-root + podinfo committed. Watch root -> example-root -> podinfo;"
+echo "  once synced, open http://podinfo.localtest.me."
