@@ -1,61 +1,32 @@
 #!/usr/bin/env bash
-# Module 3 — ArgoCD: Build the "example" root (app-of-apps) from scratch
-# The template ships the default/roots/cluster-addons projects and a live
-# cluster-addons-root, but no workloads. Here we stand up a NEW root the GitOps
-# way:
-#   1. add a child Application under roots/example/ (podinfo, pulled from its Helm repo)
-#   2. add an `example-root` Application to projects/roots.yaml pointing at roots/example/
-# The `root` Application applies example-root, example-root applies podinfo — app-of-apps.
-# Because the ingress controller is already up (03), podinfo ships with its chart
-# ingress enabled and lands at http://podinfo.localtest.me.
+# Module 3 — ArgoCD: Create the "example" project and deploy podinfo
+# The template ships the default/roots/cluster-addons projects but no workloads.
+# Here we add a dedicated `example` project the GitOps way:
+#   1. projects/example.yaml — the `example` AppProject + an `example-root`
+#      Application (in that project) that syncs roots/example/
+#   2. roots/example/podinfo.yaml — podinfo (project: example), from its Helm repo
+# The `root` Application applies projects/example.yaml; example-root then applies
+# podinfo. Because the ingress controller is already up (03), podinfo ships with
+# its chart ingress enabled and lands at http://podinfo.localtest.me.
 set -euo pipefail
 
 GITOPS_DIR="${GITOPS_DIR:-argocd-bootstrap}"
-# The podinfo child Application in this exercises checkout.
-SRC="$(cd "$(dirname "$0")/../manifests/roots/example" && pwd)"
+SRC="$(cd "$(dirname "$0")/../manifests" && pwd)"
 
 cd "$GITOPS_DIR"
 REPO_URL="$(git remote get-url origin)"
 
-# 1. The child Application (references the podinfo Helm repo — no repo URL to set).
+# 1. The example project + its root (point the root's generator at your repo).
+cp "$SRC/projects/example.yaml" projects/example.yaml
+perl -pi -e "s{__GIT_REPO_URL__}{${REPO_URL}}g" projects/example.yaml
+
+# 2. The podinfo child Application (references the podinfo Helm repo — no repo URL to set).
 mkdir -p roots/example
-cp "$SRC/podinfo.yaml" roots/example/podinfo.yaml
+cp "$SRC/roots/example/podinfo.yaml" roots/example/podinfo.yaml
 
-# 2. The example-root, appended to projects/roots.yaml (idempotent).
-if ! grep -q 'name: example-root' projects/roots.yaml; then
-  cat >> projects/roots.yaml <<YAML
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: example-root
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: roots
-  source:
-    repoURL: ${REPO_URL}
-    path: roots/example
-    targetRevision: HEAD
-    directory:
-      recurse: true
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - ServerSideApply=true
-      - CreateNamespace=true
-YAML
-fi
-
-git add roots/example/podinfo.yaml projects/roots.yaml
-git commit -m "add example root + podinfo" && git push
+git add projects/example.yaml roots/example/podinfo.yaml
+git commit -m "add example project + podinfo" && git push
 
 echo
-echo "✓ example-root + podinfo committed. Watch root -> example-root -> podinfo;"
+echo "✓ example project + podinfo committed. Watch root -> example-root -> podinfo;"
 echo "  once synced, open http://podinfo.localtest.me."

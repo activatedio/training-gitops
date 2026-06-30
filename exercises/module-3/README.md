@@ -34,7 +34,8 @@ module-3/
 │   ├── 04-add-example-root.sh  # build the example root: add roots/example/podinfo.yaml + example-root
 │   └── 05-change-and-sync.sh   # change a chart value, commit, watch it sync
 └── manifests/                                          # demo content to copy into your gitops repo
-    ├── roots/example/podinfo.yaml                       # podinfo child App, ingress enabled (copied in by 04)
+    ├── projects/example.yaml                            # `example` AppProject + example-root (copied in by 04)
+    ├── roots/example/podinfo.yaml                       # podinfo child App (project: example), ingress on (by 04)
     ├── roots/cluster-addons/sealed-secrets.yaml         # sealed-secrets add-on (see the material)
     ├── roots/cluster-addons/ingress-nginx.yaml          # ingress-nginx add-on, git generator (copied in by 03)
     ├── roots/cluster-addons/cluster-configs/in-cluster/ingress-nginx.yaml  # per-cluster opt-in (copied in by 03)
@@ -85,10 +86,11 @@ cloned template repo (default `./argocd-bootstrap`, override with `GITOPS_DIR`).
   exposes the ArgoCD UI via an SSL-passthrough Ingress (no `server.insecure` —
   port-forward over HTTPS still works). Hosts use `*.localtest.me` (→ 127.0.0.1).
 - Workloads arrive via the **app-of-apps roots** pattern, not a directory
-  ApplicationSet. `04-add-example-root.sh` builds an `example` root: it commits
-  `roots/example/podinfo.yaml` (a child Application, ingress enabled) and an
-  `example-root` Application in `projects/roots.yaml`. `root` → `example-root` →
-  `podinfo`, reachable at `http://podinfo.localtest.me`.
+  ApplicationSet. `04-add-example-root.sh` commits `projects/example.yaml` (the
+  `example` AppProject + an `example-root` Application in that project) and
+  `roots/example/podinfo.yaml` (a child Application, `project: example`, ingress
+  enabled). `root` → `example-root` → `podinfo`, reachable at
+  `http://podinfo.localtest.me`.
 - podinfo is deployed from its Helm repository, nothing vendored: the child
   Application sources the chart directly.
 - To move podinfo to a new chart release, bump `targetRevision:` in

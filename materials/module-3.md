@@ -346,16 +346,62 @@ the controller, so once it syncs the ArgoCD UI is at **https://argocd.localtest.
 (accept the self-signed cert warning). Next we'll deploy podinfo with its own
 ingress, reachable the same way.
 
-## Build an "example" root and deploy podinfo
+## Create an "example" project and deploy podinfo
 
-Workloads enter through the **app-of-apps roots** pattern. We'll stand up a new
-`example` root from scratch: a child Application for podinfo, plus a root
-Application that points at the folder holding it.
+Workloads get their own **project** — an `AppProject` that scopes what they may
+deploy — and enter through the **app-of-apps roots** pattern. We'll create an
+`example` project, with its own root, and run podinfo in it.
 
-First, the child — podinfo, pulled straight from its **Helm repository** (nothing
-vendored). This is a normal ArgoCD `Application` whose source is the chart. Since
-the ingress controller is already up, we turn on the chart's ingress out of the
-gate so podinfo is reachable at a real URL:
+First the project and its root. `projects/example.yaml` holds the `example`
+`AppProject` plus an `example-root` Application (in that project) that syncs the
+`roots/example/` directory. The `root` Application picks this up because it syncs
+`projects/`. Point `repoURL` at your repo:
+
+`projects/example.yaml`
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: example
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: example workloads
+  sourceRepos: ['*']
+  destinations:
+    - { namespace: '*', server: '*' }
+  clusterResourceWhitelist:
+    - { group: '*', kind: '*' }
+  namespaceResourceWhitelist:
+    - { group: '*', kind: '*' }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: example-root
+  namespace: argocd
+spec:
+  project: example
+  source:
+    repoURL: https://github.com/you/your-gitops-repo
+    path: roots/example
+    targetRevision: HEAD
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true, CreateNamespace=true]
+```
+
+Then the workload — podinfo, pulled straight from its **Helm repository** (nothing
+vendored), running in the `example` project. Since the ingress controller is
+already up, we turn on the chart's ingress out of the gate so podinfo is reachable
+at a real URL:
 
 `roots/example/podinfo.yaml`
 
@@ -366,7 +412,7 @@ metadata:
   name: podinfo
   namespace: argocd
 spec:
-  project: roots
+  project: example
   source:
     repoURL: https://stefanprodan.github.io/podinfo
     chart: podinfo
@@ -392,47 +438,21 @@ spec:
     syncOptions: [ServerSideApply=true, CreateNamespace=true]
 ```
 
-Then the root — an `example-root` Application (in the `roots` project) that syncs the
-`roots/example/` directory. Add it to `projects/roots.yaml` (next to
-`cluster-addons-root`), pointing `repoURL` at your repo:
-
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: example-root
-  namespace: argocd
-spec:
-  project: roots
-  source:
-    repoURL: https://github.com/you/your-gitops-repo
-    path: roots/example
-    targetRevision: HEAD
-    directory:
-      recurse: true
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  syncPolicy:
-    automated: { prune: true, selfHeal: true }
-    syncOptions: [ServerSideApply=true, CreateNamespace=true]
-```
-
 Commit and push:
 
 ```bash
-git add roots/example/podinfo.yaml projects/roots.yaml
-git commit -m "add example root + podinfo" && git push
+git add projects/example.yaml roots/example/podinfo.yaml
+git commit -m "add example project + podinfo" && git push
 ```
 
-Watch the chain in the UI: `root` applies your new `example-root`,
-`example-root` applies the `podinfo` Application, and `podinfo` pulls the chart
-from its Helm repository and deploys it to the `podinfo` namespace. That's
-app-of-apps — a root is just an Application whose children are more Applications.
-Because we enabled the chart's ingress, podinfo is reachable at
-**http://podinfo.localtest.me** — no port-forward. To change podinfo later, edit
-`roots/example/podinfo.yaml` (e.g. bump `targetRevision`), commit, and ArgoCD
-shows the diff before it syncs.
+Watch the chain in the UI: `root` applies your `example` project and its
+`example-root`, `example-root` applies the `podinfo` Application, and `podinfo`
+pulls the chart from its Helm repository and deploys it to the `podinfo`
+namespace. That's app-of-apps — a root is just an Application whose children are
+more Applications, all scoped to the `example` project. Because we enabled the
+chart's ingress, podinfo is reachable at **http://podinfo.localtest.me** — no
+port-forward. To change podinfo later, edit `roots/example/podinfo.yaml` (e.g.
+bump `targetRevision`), commit, and ArgoCD shows the diff before it syncs.
 
 ### Wrap-up
 
