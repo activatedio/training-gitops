@@ -7,7 +7,8 @@ loop, Kubernetes resources and Helm packaging, and walks through deploying a sam
 
 - Docker to run a kind cluster.
 - `git`
-- A GitHub account, including a repo and Personal Access Token with `repo` scope.
+- `kind`
+- Access to a GitHub account.
 
 ## Modules
 
