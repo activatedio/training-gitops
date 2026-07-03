@@ -6,7 +6,7 @@ Hands-on command scripts for **Module 4: Flux**. They deploy the same
 (`https://stefanprodan.github.io/podinfo`) via a `HelmRepository` source and a
 `HelmRelease`, reconciled by the helm-controller.
 
-> ArgoCD deploys the same app in **Module 3** ([exercises/module-3](../module-3)).
+> ArgoCD deploys the same app in **Module 3** ([exercises/exercise-2](../exercise-2)).
 
 ## Prerequisites
 

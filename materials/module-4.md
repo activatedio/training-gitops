@@ -15,11 +15,11 @@ the same prerequisites as Module 3:
 ### The cluster
 
 Flux and ArgoCD both want to own the cluster, so start Module 4 on a clean one.
-Reset the local `kind` cluster from Module 1:
+Reset the local `kind` cluster from Module 3:
 
 ```bash
 kind delete cluster --name gitops-demo
-kind create cluster --config exercises/module-1/kind-config.yaml
+kind create cluster --config exercises/exercise-2/kind-config.yaml
 kubectl get nodes
 ```
 

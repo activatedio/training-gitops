@@ -2,6 +2,29 @@
 
 ## Introduction
 
+Kubernetes was first released in 2015 and is widely used to run container-based
+workloads. Opinions about it vary widely. I started using it in 2021 and became
+a proponent once I develpoed a system to manage it. In this video I want to
+introce you to running Kubernetes clusters by storing configuration in a git
+repository. But first, for background, I'll describe Kubernetes itself and its
+effective use of a control loop.
+
+
+### Kubernetes
+
+What is Kubernetes? A Kubernetes cluster is a control plane and set of worker nodes. The control
+plane stores what you want and acts on it. Nodes are the machines that actually
+run your workloads. The control plane uses a data store, usually etcd, and runs an
+API server. You declare what you want via the API and the cluster makes it real. Let's take the example of a "Deployment", perhaps the most common Kubernets "resource type". As an administrator, you can create a "Deployment" via the API using a tool like kubectl, and assuming a valid configuration, you will see containers running on your nodes. Let's see this in action.
+
+[Exercise 1]
+
+Deployment can be created by a call to the API. At first it information is stored, but
+nothing is actually running.
+
+
+
+
 In this video we'll look at how GitOps, with tools like ArgoCD and Flux, can be
 used to manage Kubernetes clusters effectively. We’ll start by describing the
 core of Kubernetes and how its elegant design makes GitOps a good fit. I’ll
@@ -22,19 +45,10 @@ loop: the temperature change introduced by the actuator eventually shows up at
 the comparator. Declare a target, measure reality, act to match. Kubernetes
 works this way.
 
-### Clusters and Nodes
-
-A Kubernetes cluster is a control plane and set of worker nodes. The control
-plane stores what you want and acts on it. Nodes are the machines that actually
-run your workloads. You declare what you want — the cluster decides where it
-runs. In some clusters, especially self-managed ones, the control-plane
-components run as workloads on nodes within the cluster itself. For
-cloud-deployed Kubernetes, the control plane is a hosted service.
 
 ### The Kubernetes Core: etcd and the API Server
 
-At the core of the control plane is a reliable data store, usually etcd, and an
-API server — a single interface to read and write resources for the cluster. Our
+ Our
 example resource is a Deployment: a declaration of a long-running workload. But
 a Deployment created via the API and sitting in etcd doesn't do anything yet.
 It's just a stored idea — like a thermostat's setpoint. Getting from that idea

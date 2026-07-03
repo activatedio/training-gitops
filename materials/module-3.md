@@ -17,13 +17,12 @@ Kind and kubectl can be installed with Homebrew on a Mac.
 
 ### The cluster
 
-We'll reuse the same local `kind` cluster from Module 1. If it's still running
-you're set — `kubectl get nodes` should list the `gitops-demo` control-plane and
-two workers. If you tore it down (or skipped Module 1), recreate it from the
-config in the exercises:
+This exercise needs a `kind` cluster prepared for an ingress controller — the
+`kind-config.yaml` in the exercise maps the host's ports 80/443 onto a node and
+labels it `ingress-ready`. Create it:
 
 ```bash
-kind create cluster --config exercises/module-1/kind-config.yaml
+kind create cluster --config exercises/exercise-2/kind-config.yaml
 kubectl get nodes      # the gitops-demo control-plane + 2 workers
 ```
 
@@ -161,7 +160,7 @@ cluster.
 
 That makes it an ideal cluster-addon: every cluster needs the controller, and the
 install is identical everywhere. Add it as an ApplicationSet at
-`roots/cluster-addons/sealed-secrets.yaml` (a copy is in the Module 3 exercises):
+`roots/cluster-addons/sealed-secrets.yaml`:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
