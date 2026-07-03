@@ -1,6 +1,6 @@
 # Exercise 2 — GitOps with ArgoCD
 
-A hands-on walk through deploying using ArgoCD.
+A hands-on walk through deploying the podinfo application using ArgoCD.
 
 ## Prerequisites
 
@@ -52,7 +52,7 @@ Applications, the `cluster-resources` ApplicationSet, and the `default` / `roots
 make install
 ```
 
-## 3. Open the UI
+## Open the UI
 
 ```bash
 make password        # prints the initial admin password (user: admin)
@@ -68,10 +68,11 @@ workloads yet.
 > step 2) so the paths below are relative to the repo root, and wherever you see
 > `https://github.com/you/your-gitops-repo`, use your own repo URL.
 
-## 5. Install an ingress controller
+## Install an ingress controller
 
-Install ingress to allow access to the ArgoCD UI and pod info once it is installed.
-This uses a git files generator to install where a configuration exists. We will provide one for `in-cluster`.
+Install ingress so we can reach the ArgoCD UI and podinfo once they're installed.
+This uses a git files generator that installs only where a configuration file
+exists; we provide one for `in-cluster`.
 
 Create the ApplicationSet at `roots/cluster-addons/ingress-nginx.yaml` and set
 `repoURL` under the git generator to your repo.
@@ -174,7 +175,10 @@ syncs the ArgoCD UI is available at **https://argocd.localtest.me**.
 
 ## Create the `example` project and deploy podinfo
 
-Now we will install the podinfo application into its own project and using an Application. First we create the project and the root application.
+Now we will install the podinfo application into its own project using an
+Application. First, create `projects/example.yaml` with the `example` project and
+its root application (the `root` Application syncs `projects/`, so it applies
+this):
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -260,9 +264,11 @@ podinfo is at **http://podinfo.localtest.me**.
 
 ## Change something and watch it sync
 
-Now let's change a value, view the diff in the Argo UI, and then sync to see the change be made live.
+Now let's change a value, view the diff in the ArgoCD UI, and then sync to see the
+change made live.
 
-In `roots/example/podinfo.yaml`, change the `ui.message` value to any value.
+In `roots/example/podinfo.yaml`, change the `ui.message` value to anything you
+like.
 
 ```bash
 git commit -am "podinfo: change ui.message" && git push

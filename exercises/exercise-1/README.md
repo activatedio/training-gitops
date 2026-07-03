@@ -1,6 +1,7 @@
 # Exercise 1 — The Control Loop
 
-A hands-on walk through showing a simple Deployment and how it propgates through to a ReplicaSet and Pods.
+A hands-on walk through a simple Deployment and how it propagates through to a
+ReplicaSet and Pods.
 
 ## Prerequisites
 
@@ -23,21 +24,27 @@ kubectl get nodes -o wide
 
 ## Watch events live
 
-Open a **second terminal** and run the following command to see the events propogate in real time.
+Open a **second terminal** and run the following command to see the events
+propagate in real time.
 
 ```bash
 kubectl get events -n loop-demo --watch
 ```
 
-## Apply and deployment
+## Apply the deployment
 
-Apply the simple manifest and `manifest.yaml` to see a Deployment, ReplicaSet, and Pods created:
+Apply the simple manifest `manifest.yaml` to create a Namespace, Deployment,
+ReplicaSet, and Pods:
 
 ```bash
 kubectl apply -f manifest.yaml
 ```
 
-The objects now created and you can watch the rollout converge:
+The objects are now created. Watch the rollout converge:
+
+```bash
+kubectl rollout status deployment/web -n loop-demo --timeout=90s
+```
 
 ## See what the controllers built
 
@@ -48,4 +55,5 @@ scheduler placed on nodes:
 kubectl get deployment,replicaset,pods -n loop-demo -o wide
 ```
 
-Note the **owner chain**: Deployment → ReplicaSet → Pod. These are each deployed by controllers as the state is converged to what you have specified.
+Note the **owner chain**: Deployment → ReplicaSet → Pod. Each is created by a
+controller as the cluster converges to the state you specified.
